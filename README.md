@@ -1,2 +1,2 @@
 # Arch-setup
-A custom installer script for archlinux.
+A single file and fully customizable installer script for archlinux.
