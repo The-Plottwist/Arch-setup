@@ -16,7 +16,7 @@ Archlinux is a distro that it gives full control to anyone who wants to install 
 
 ## Pros
 
-- Exactly follows the [archlinux installation guide]([Installation guide - ArchWiki](https://wiki.archlinux.org/title/Installation_guide)).
+- Follows the [archlinux installation guide]([Installation guide - ArchWiki](https://wiki.archlinux.org/title/Installation_guide)).
 
 - Automatically installs a Desktop Environment
 
