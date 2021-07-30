@@ -12,4 +12,14 @@ Archlinux is a distro that it gives full control to anyone who wants to install 
 
 - Ease of customization
 
-- Explanation of each section (of the code)
+- Explanation of each sections (of the code)
+
+## Pros
+
+- Automatically installs a Desktop Environment
+
+- Automatically installs an Aur helper (which is yay)
+
+- Automatically installs a set of packages (both aur and official)
+
+- And most importantly, you have the opportunity to browse and edit the code directly. With this way, you can tailor it the way you want.
