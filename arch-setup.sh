@@ -602,8 +602,8 @@ if [ "$ANSWER" == "y" ]; then
     #TODO: Alan 2Tib'den fazlaysa gpt yapılacak
     
     #Sizing                                             #Configurations used
-    #BIOS Grub - 1mib (If needed)
-    #EFI System Partition [ESP] - 512mib (If needed)    https://superuser.com/questions/1310927/what-is-the-absolute-minimum-size-a-uefi-system-partition-can-be/1310938#1310938
+    #BIOS Grub - 1mib
+    #EFI System Partition [ESP] - 512mib                https://superuser.com/questions/1310927/what-is-the-absolute-minimum-size-a-uefi-system-partition-can-be/1310938#1310938
     #Boot - 500mib
     #Swap - 8gib                                        https://wiki.archlinux.org/title/Dm-crypt/Encrypting_an_entire_system#LVM_on_LUKS
     #System - 32gib (If seperate)
@@ -644,7 +644,7 @@ if [ "$ANSWER" == "y" ]; then
         if [ "$IS_UEFI" == "true" ]; then #Encrypt true, UEFI=true
         
             parted "$DISK" --script "mktable gpt" \
-                                    "mkpart EFI System Partition 1mib 513mib" \
+                                    "mkpart EFI_System_Partition 1mib 513mib" \
                                     "mkpart BOOT 514mib 1014mib" \
                                     "mkpart SYSTEM 1015mib -1"
             
@@ -692,11 +692,11 @@ if [ "$ANSWER" == "y" ]; then
             if [ "$IS_SEPERATE" == "true" ]; then #Encrypt false, UEFI=true, is seperate=true
                 
                 parted "$DISK" --script "mktable gpt" \
-                                        "mkpart EFI System Partition 1mib 513mib" \
+                                        "mkpart EFI_System_Partition 1mib 513mib" \
                                         "mkpart BOOT 514mib 1014mib" \
-                                        "mkpart SWAP 1015mib 8.99gib" \
-                                        "mkpart SYSTEM 9gib 41gib" \
-                                        "mkpart HOME 41.1gib -1"
+                                        "mkpart SWAP 1015mib 9207mib" \
+                                        "mkpart SYSTEM 9208mib 41976mib" \
+                                        "mkpart HOME 41977mib -1"
                 
                 ESP="$DISK"1
                 BOOT_PARTITION="$DISK"2
@@ -706,10 +706,10 @@ if [ "$ANSWER" == "y" ]; then
             else #Encrypt false, UEFI=true, is seperate=false
             
                 parted "$DISK" --script "mktable gpt" \
-                                        "mkpart EFI System Partition 1mib 513mib" \
+                                        "mkpart EFI_System_Partition 1mib 513mib" \
                                         "mkpart BOOT 514mib 1014mib" \
-                                        "mkpart SWAP 1015mib 8.99gib" \
-                                        "mkpart SYSTEM 9gib -1"
+                                        "mkpart SWAP 1015mib 9207mib" \
+                                        "mkpart SYSTEM 9208mib -1"
                     
                 ESP="$DISK"1
                 BOOT_PARTITION="$DISK"2
@@ -725,9 +725,9 @@ if [ "$ANSWER" == "y" ]; then
                     parted "$DISK" --script "mktable gpt" \
                                             "mkpart GRUB 1mib 2mib" \
                                             "mkpart BOOT 3mib 503mib" \
-                                            "mkpart SWAP 504mib 8.49gib" \
-                                            "mkpart SYSTEM 8.50gib 40.50gib" \
-                                            "mkpart HOME 40.51gib -1"
+                                            "mkpart SWAP 504mib 8696mib" \
+                                            "mkpart SYSTEM 8697mib 41465mib" \
+                                            "mkpart HOME 41466mib -1"
                     
                     parted "$DISK" --script "set 1 bios_grub on"
                     
@@ -740,9 +740,9 @@ if [ "$ANSWER" == "y" ]; then
                     parted "$DISK" --script "mktable msdos" \
                                             "mkpart primary 1mib 501mib" \
                                             "mkpart extended 502mib -1" \
-                                            "mkpart logical 503mib 8.49gib" \
-                                            "mkpart logical 8.50gib 40.50gib" \
-                                            "mkpart logical 40.51gib -1"
+                                            "mkpart logical 503mib 8695mib" \
+                                            "mkpart logical 8696mib 41464mib" \
+                                            "mkpart logical 41465mib -1"
                     
                     BOOT_PARTITION="$DISK"1
                     #Warning! Logical partitions start from 5.
@@ -758,8 +758,8 @@ if [ "$ANSWER" == "y" ]; then
                     parted "$DISK" --script "mktable gpt" \
                                             "mkpart GRUB 1mib 2mib" \
                                             "mkpart BOOT 3mib 503mib" \
-                                            "mkpart SWAP 504mib 8.49gib" \
-                                            "mkpart SYSTEM 8.50gib -1"
+                                            "mkpart SWAP 504mib 8696mib" \
+                                            "mkpart SYSTEM 8697mib -1"
                                         
                     parted "$DISK" --script "set 1 bios_grub on"
                     
@@ -771,8 +771,8 @@ if [ "$ANSWER" == "y" ]; then
                     parted "$DISK" --script "mktable msdos" \
                                             "mkpart primary 1mib 501mib" \
                                             "mkpart extended 502mib -1" \
-                                            "mkpart logical 503mib 8.49gib" \
-                                            "mkpart logical 8.50gib -1"
+                                            "mkpart logical 503mib 8695mib" \
+                                            "mkpart logical 8696mib -1"
                     
                     BOOT_PARTITION="$DISK"1
                     #Warning! Logical partitions start from 5.
@@ -786,7 +786,11 @@ if [ "$ANSWER" == "y" ]; then
 else #Manuel partition selection
     
     #Partition table is not suitable for linux
-    [ "$PARTITION_TABLE" == "other" ] && { prompt_warning "ERROR! Partition table not supported! "; failure "Please use auto partitioning or format it with a correct table (MBR or GPT)."; }
+    if [ "$PARTITION_TABLE" == "other" ]; then
+    
+        prompt_warning "ERROR! Partition table not supported! "
+        failure "Please use auto partitioning or format it with a correct table (MBR or GPT)."
+    fi
     
     #Inform the user about needed partitions
     prompt_different "Needed partitions are:"
@@ -798,30 +802,35 @@ else #Manuel partition selection
     prompt_different "#Boot Partition"
     prompt_different "#Swap Partition"
     prompt_different "#System Partition"
-    prompt_different "#Home Partition"
+    prompt_different "#Home Partition (You will have option to seperate)"
     
     
     #Get BIOS Grub partition
+    max_partition=$(parted $DISK --script print | awk '{print $1}' | tail -1)
     if output=$([ "$PARTITION_TABLE" == "gpt" ] && [ "$IS_UEFI" == "false" ]); then
     
-        clear
-        parted --script "$DISK" "print"
-        prompt_question "Please specify the number for the Grub parition (1mib partition advised): "
-        read -e -r GRUB_PARTITION_NUMBER
-        while ! output=$(parted "$DISK" --script "print" | awk '{print $1}' | grep "$GRUB_PARTITION_NUMBER" &>> /dev/null); do
+        while true; do
     
-            prompt_warning "Wrong number!"
-            printf "Answer: "
+            clear
+            parted --script "$DISK" "print"
+            
+            prompt_question "Please specify the number for the Grub parition (1mib partition advised): "
             read -e -r GRUB_PARTITION_NUMBER
+            
+            #Check if number and check if exceeds the maximum partition number
+            if output=$([[ ! $GRUB_PARTITION_NUMBER =~ ^[0-9]+$ ]] || (( $GRUB_PARTITION_NUMBER > $max_partition ))); then
+            
+                prompt_warning "Wrong number!"
+                prompt_warning "Please re-enter."
+                sleep 2s
+            else
+            
+                parted "$DISK" --script "set $GRUB_PARTITION_NUMBER bios_grub on"
+                sleep 2s
+                break
+            fi
         done
-        
-        parted "$DISK" --script "set $GRUB_PARTITION_NUMBER bios_grub on"
-        sleep 2s
     fi
-    
-    #Print the disk
-    clear
-    lsblk "$DISK" -o +path,partlabel
     
     #Get ESP
     if [ "$IS_UEFI" == "true" ]; then
@@ -830,6 +839,10 @@ else #Manuel partition selection
         mkdir -p /mnt/is_esp
     
         while true; do
+        
+            #Print the disk
+            clear
+            lsblk "$DISK" -o +path,partlabel
         
             prompt_question "Please enter the path for EFI System partiton: "
             partition_check
