@@ -42,10 +42,13 @@ declare TIMEZONE=""
 declare DEVICE=""
 declare VOLGROUP=""
 declare DISK=""
+declare DISK_SIZE_TIB=""
+declare DISK_SIZE_MIB=""
 declare IS_UEFI=""
 declare IS_ENCRYPT=""
 declare IS_SEPERATE=""
 declare ESP=""
+declare IS_ESP_FORMAT=""
 declare BOOT_PARTITION=""
 declare ENCRYPT_PARTITION=""
 declare SYSTEM_PARTITION=""
@@ -54,7 +57,7 @@ declare SWAP_PARTITION=""
 
 
 #TODO: Paketler açıklanacak
-#All additional packages will be prompted to user.
+#All additional packages will be asked to the user.
 #They will be added to the original set if accepted.
 declare CORE_PACKAGES="base linux linux-firmware"
 
@@ -318,7 +321,7 @@ function pkg_select () {
 #Warning: Mix use of double quotes ("") and single quotes ('')
 function setup_second_phase () {
 
-#Get user name that taken after the install function and delete that file
+#Get user name that taken after first phase and delete that file
 declare USER_NAME=""
 USER_NAME="$(cat /mnt/$DEVICE/user_name.txt)"
 rm "/mnt/$DEVICE/user_name.txt"
@@ -505,7 +508,9 @@ chmod +x setup_second_phase.sh
 
 
 
-# ----------------------------------- Main ----------------------------------- #
+# ---------------------------------------------------------------------------- #
+#                                  First Phase                                 #
+# ---------------------------------------------------------------------------- #
 
 #Assumes keyboard layout setted
 
@@ -573,22 +578,26 @@ else
 fi
 
 
-#Mbr or gpt?
+# ------------------------------ Partition Table ----------------------------- #
 #You can visit the below link for additional information
 #https://wiki.gentoo.org/wiki/Handbook:AMD64/Installation/Disks#Partition_tables
-if [ "$IS_UEFI" == "false" ]; then
 
-    if [ "gpt" == $(parted "$DISK" --script print | grep "Partition Table:" | awk '{print $3}') ]; then
-    
-        PARTITION_TABLE="gpt"
-    elif [ "msdos" == $(parted "$DISK" --script print | grep "Partition Table:" | awk '{print $3}') ]; then
-    
-        PARTITION_TABLE="msdos"
-    else
-    
-        PARTITION_TABLE="other"
-    fi
+#Get disk size and subtract the extension
+DISK_SIZE_MIB=$(parted "$DISK" --script "u mib" \ "print" | grep "Disk $DISK:" | awk '{print $3}' | sed s/[A-Za-z]//g)
+#Convert to TiB
+DISK_SIZE_TIB=$(( DISK_SIZE_MIB/(1024*1024) ))
+
+#Wait before using parted again in case the disk is old
+sleep 2s
+
+#Get Partition Table
+PARTITION_TABLE=$(parted "$DISK" --script print | grep "Partition Table:" | awk '{print $3}')
+
+if output=$([ "$PARTITION_TABLE" != "msdos" ] && [ "$PARTITION_TABLE" != "gpt" ]); then
+
+    PARTITION_TABLE="other"
 fi
+
 
 # ------------------------------- Partitioning ------------------------------- #
 #In the below link, you can find the answer for the question of - Why first partition generally starts from sector 2048 (1mib)? -
@@ -597,18 +606,44 @@ fi
 prompt_question "Do you want to use auto partitioning? - All data will be ERASED! - (y/n): "
 yes_no
 if [ "$ANSWER" == "y" ]; then
-    
-    #TODO: Yeterli alan var mı diye kontrol edilecek
-    #TODO: Alan 2Tib'den fazlaysa gpt yapılacak
-    
-    #Sizing                                             #Configurations used
+
+    #GPT is required for disks that are bigger than 2TiB
+    if (( DISK_SIZE_TIB > 2 )); then
+
+        PARTITION_TABLE="gpt"
+    fi
+
+    #Sizing                                             #Scheme used
     #BIOS Grub - 1mib
     #EFI System Partition [ESP] - 512mib                https://superuser.com/questions/1310927/what-is-the-absolute-minimum-size-a-uefi-system-partition-can-be/1310938#1310938
     #Boot - 500mib
     #Swap - 8gib                                        https://wiki.archlinux.org/title/Dm-crypt/Encrypting_an_entire_system#LVM_on_LUKS
     #System - 32gib (If seperate)
     #Home - All of the available space
+
+    #Calculate needed size
+    declare -i NEEDED_SIZE=0
+    if output=$([ "$PARTITION_TABLE" == "gpt" ] && [ "$IS_UEFI" == "false" ]); then
     
+        NEEDED_SIZE+=1
+    elif [ "$IS_UEFI" == "true" ]; then
+    
+        NEEDED_SIZE+=512
+    fi
+    NEEDED_SIZE+=500
+    NEEDED_SIZE+=8192
+    NEEDED_SIZE+=32768
+
+    #If not enough space
+    if (( DISK_SIZE_MIB > NEEDED_SIZE )); then
+    
+        #Convert MiB to GiB
+        NEEDED_SIZE=$((NEEDED_SIZE/1024))
+        prompt_warning "Not enough disk space!"
+        prompt_warning "Minimum needed size is $NEEDED_SIZE GiB (with merged home & system partitions)"
+        failure "If you still want to install, manually partition your device with MBR org GPT and don't use auto-partitioning."
+    fi
+
     if output=$([ "$PARTITION_TABLE" != "gpt" ] && [ "$IS_UEFI" == "false" ]); then
     
         prompt_different "Two of the popular linux supported partition tables are GPT and MBR."
@@ -627,7 +662,8 @@ if [ "$ANSWER" == "y" ]; then
             PARTITION_TABLE="gpt"
         fi
     fi
-    
+
+
     prompt_question "Do you want an encrypted system partition? (y/n): "
     yes_no
     if [ "$ANSWER" == "y" ]; then
@@ -644,11 +680,15 @@ if [ "$ANSWER" == "y" ]; then
         if [ "$IS_UEFI" == "true" ]; then #Encrypt true, UEFI=true
         
             parted "$DISK" --script "mktable gpt" \
-                                    "mkpart EFI_System_Partition 1mib 513mib" \
+                                    "mkpart \"EFI System Partition\" 1mib 513mib" \
                                     "mkpart BOOT 514mib 1014mib" \
                                     "mkpart SYSTEM 1015mib -1"
+
+            parted "$DISK" --script "set 1 boot on" \
+                                    "set 1 esp on"
             
             ESP="$DISK"1
+            IS_ESP_FORMAT="true"
             BOOT_PARTITION="$DISK"2
             ENCRYPT_PARTITION="$DISK"3
         else
@@ -659,8 +699,8 @@ if [ "$ANSWER" == "y" ]; then
                                         "mkpart GRUB 1mib 2mib" \
                                         "mkpart BOOT 3mib 503mib" \
                                         "mkpart SYSTEM 504mib -1"
-                                        
-                    parted "$DISK" --script "set 1 bios_grub on"
+
+                parted "$DISK" --script "set 1 bios_grub on"
                 
                 BOOT_PARTITION="$DISK"2
                 ENCRYPT_PARTITION="$DISK"3
@@ -692,13 +732,18 @@ if [ "$ANSWER" == "y" ]; then
             if [ "$IS_SEPERATE" == "true" ]; then #Encrypt false, UEFI=true, is seperate=true
                 
                 parted "$DISK" --script "mktable gpt" \
-                                        "mkpart EFI_System_Partition 1mib 513mib" \
+                                        "mkpart \"EFI System Partition\" 1mib 513mib" \
                                         "mkpart BOOT 514mib 1014mib" \
                                         "mkpart SWAP 1015mib 9207mib" \
                                         "mkpart SYSTEM 9208mib 41976mib" \
                                         "mkpart HOME 41977mib -1"
+
+                #ESP
+                parted "$DISK" --script "set 1 boot on" \
+                                        "set 1 esp on"
                 
                 ESP="$DISK"1
+                IS_ESP_FORMAT="true"
                 BOOT_PARTITION="$DISK"2
                 SWAP_PARTITION="$DISK"3
                 SYSTEM_PARTITION="$DISK"4
@@ -706,12 +751,17 @@ if [ "$ANSWER" == "y" ]; then
             else #Encrypt false, UEFI=true, is seperate=false
             
                 parted "$DISK" --script "mktable gpt" \
-                                        "mkpart EFI_System_Partition 1mib 513mib" \
+                                        "mkpart \"EFI System Partition\" 1mib 513mib" \
                                         "mkpart BOOT 514mib 1014mib" \
                                         "mkpart SWAP 1015mib 9207mib" \
                                         "mkpart SYSTEM 9208mib -1"
+
+                #ESP
+                parted "$DISK" --script "set 1 boot on" \
+                                        "set 1 esp on"
                     
                 ESP="$DISK"1
+                IS_ESP_FORMAT="true"
                 BOOT_PARTITION="$DISK"2
                 SWAP_PARTITION="$DISK"3
                 SYSTEM_PARTITION="$DISK"4
@@ -802,13 +852,19 @@ else #Manuel partition selection
     prompt_different "#Boot Partition"
     prompt_different "#Swap Partition"
     prompt_different "#System Partition"
-    prompt_different "#Home Partition (You will have option to seperate)"
+    prompt_different "#Home Partition (optional)"
     
     
-    #Get BIOS Grub partition
+    #BIOS GRUB partition
+    #Get last partition number
     max_partition=$(parted $DISK --script print | awk '{print $1}' | tail -1)
+    
+    #Wait before using parted again in case the disk is old
+    sleep 2s
+    
     if output=$([ "$PARTITION_TABLE" == "gpt" ] && [ "$IS_UEFI" == "false" ]); then
     
+        declare GRUB_PARTITION_NUMBER=""
         while true; do
     
             clear
@@ -818,7 +874,7 @@ else #Manuel partition selection
             read -e -r GRUB_PARTITION_NUMBER
             
             #Check if number and check if exceeds the maximum partition number
-            if output=$([[ ! $GRUB_PARTITION_NUMBER =~ ^[0-9]+$ ]] || (( $GRUB_PARTITION_NUMBER > $max_partition ))); then
+            if output=$( [[ ! $GRUB_PARTITION_NUMBER =~ ^[0-9]+$ ]] || (( $GRUB_PARTITION_NUMBER > $max_partition )) ); then
             
                 prompt_warning "Wrong number!"
                 prompt_warning "Please re-enter."
@@ -837,6 +893,8 @@ else #Manuel partition selection
         
         #Make is_esp directory and don't prompt for error if exist
         mkdir -p /mnt/is_esp
+    
+        IS_ESP_FORMAT="false"
     
         while true; do
         
@@ -859,6 +917,7 @@ else #Manuel partition selection
                 umount /mnt/is_esp
                 prompt_warning "Not an EFI System partition!"
                 prompt_warning "Please re-enter!"
+                prompt_warning "You can always quit with Ctrl-C or Ctrl-Z if needed."
                 sleep 2s
                 clear
             fi
@@ -934,11 +993,105 @@ else #Manuel partition selection
     fi
 fi
 
+#Wait before using parted again in case the disk is old
+sleep 2s
+
+#Print current configuration
+clear
+prompt_info "Current configuration:"
+parted "$DISK" --script "print"
+sleep 7s
+
+
 # -------------------------------- Encrypting -------------------------------- #
+#Scheme used:
+#https://wiki.archlinux.org/title/Dm-crypt/Encrypting_an_entire_system#LVM_on_LUKS
+
 if [ "$IS_ENCRYPT" == "true" ]; then
 
-    #TODO: Encrypt yapılacak
+    clear
+    prompt_info "Encrypting $ENCRYPT_PARTITION..."
+    
+    #Check if cryptsetup exited normally
+    while ! cryptsetup luksFormat "$ENCRYPT_PARTITION"; do
+
+        prompt_warning "Try again."
+        prompt_warning "You can always quit with Ctrl-C or Ctrl-Z if needed."
+        sleep 3s
+        clear
+    done
+
+    prompt_info "Opening $ENCRYPT_PARTITION..."
+    cryptsetup open "$ENCRYPT_PARTITION" cryptlvm
+
+    #Prepare logical volumes
+    clear
+    prompt_info "Making logical volumes..."
+    pvcreate /dev/mapper/cryptlvm
+    vgcreate "$VOLGROUP" /dev/mapper/cryptlvm
+    lvcreate -L 8G "$VOLGROUP" -n swap
+    lvcreate -L 32G "$VOLGROUP" -n root
+    lvcreate -l 100%FREE "$VOLGROUP" -n home
+
+    SYSTEM_PARTITION="/dev/mapper/$VOLGROUP-root"
+    HOME_PARTITION="/dev/mapper/$VOLGROUP-home"
+    SWAP_PARTITION="/dev/mapper/$VOLGROUP-swap"
 fi
 
-#Mounting efi
+
+# ------------------------------- File systems ------------------------------- #
+prompt_info "Making file systems..."
+
+if output=$([ "$IS_UEFI" == "true" ] && [ "$IS_ESP_FORMAT" == "true" ]); then
+
+    mkfs.fat "$ESP" || failure "Cannot make file system in $ESP."
+fi
+
+if [ "$IS_SEPERATE" == "true" ]; then
+
+    mkfs.ext4 -F -F "$BOOT_PARTITION" || failure "Cannot make file system in $BOOT_PARTITION."
+    mkfs.ext4 -F -F "$SYSTEM_PARTITION" || failure "Cannot make file system in $SYSTEM_PARTITION."
+    mkfs.ext4 -F -F "$HOME_PARTITION" || failure "Cannot make file system in $HOME_PARTITION."
+    mkswap -f "$SWAP_PARTITION" || failure "Cannot make file system in $SWAP_PARTITION."
+    swapon "$SWAP_PARTITION" || failure "Cannot activate swap on $SWAP_PARTITION."
+
+elif [ "$IS_SEPERATE" == "false" ]; then
+
+    mkfs.ext4 -F -F "$BOOT_PARTITION" || failure "Cannot make file system in $BOOT_PARTITION."
+    mkfs.ext4 -F -F "$SYSTEM_PARTITION" || failure "Cannot make file system in $SYSTEM_PARTITION."
+    mkswap -f "$SWAP_PARTITION" || failure "Cannot make file system in $SWAP_PARTITION."
+    swapon "$SWAP_PARTITION" || failure "Cannot activate swap on $SWAP_PARTITION."
+else
+
+    failure "Script is not running properly!"
+fi
+
+
+# --------------------------------- Mounting --------------------------------- #
+prompt_info "Mounting..."
+
+#Mount system
+mkdir -p "/mnt/$DEVICE"
+mount "$SYSTEM_PARTITION" "/mnt/$DEVICE"
+
+#Mount efi
 #https://wiki.archlinux.org/title/EFI_system_partition#Mount_the_partition
+if [ "$IS_UEFI" == "true" ]; then
+
+    mkdir -p "/mnt/$DEVICE/efi"
+    mount "$ESP" "/mnt/$DEVICE/efi"
+fi
+
+#Mount boot
+mkdir -p "/mnt/$DEVICE/boot"
+mount "$BOOT_PARTITION" "/mnt/$DEVICE/boot"
+
+#Mount home
+if [ "$IS_SEPERATE" == "true" ]; then
+    
+    mkdir -p "/mnt/$DEVICE/home"
+    mount "$HOME_PARTITION" "/mnt/$DEVICE/home"
+fi
+
+
+
