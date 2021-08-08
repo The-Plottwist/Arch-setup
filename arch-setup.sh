@@ -11,7 +11,7 @@
 #    (at your option) any later version.
 #    This program is distributed in the hope that it will be useful,
 #    but WITHOUT ANY WARRANTY; without even the implied warranty of
-#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 #    GNU General Public License for more details.
 #    You should have received a copy of the GNU General Public License
 #    along with this program.  If not, see <https://www.gnu.org/licenses/>.
@@ -21,13 +21,16 @@
 
 #Important note:
 #This script is consists of two phases.
-#First phase includes: Partitioning - Installing system, bootloader & official packages - Adding a user account & Setting root a password
+#First phase includes: Partitioning - Installing system - Installing bootloader & official packages - Adding a user account & Setting a root password
 #Second phase includes: Installing aur packages - Enabling services
 #You can find second phase function in the ...th line
 
 #Table of Contents
 #
 
+
+#Followed guide:
+#https://wiki.archlinux.org/title/Installation_guide
 
 
 # ---------------------------------- Globals --------------------------------- #
@@ -38,7 +41,6 @@ declare PKG_SELECT=""
 declare ANSWER=""
 
 declare PARTITION_TABLE=""
-declare TIMEZONE=""
 declare DEVICE=""
 declare VOLGROUP=""
 declare DISK=""
@@ -61,22 +63,26 @@ declare SWAP_PARTITION=""
 #They will be added to the original set if accepted.
 declare CORE_PACKAGES="base linux linux-firmware"
 
-declare ESSENTIAL_PACKAGES="lvm2 sudo base-devel screen git python python-pip cpupower thermald dhcpcd dhclient flatpak parted htop lshw man-db man-pages texinfo mc nano net-tools network-manager-applet networkmanager nm-connection-editor ntfs-3g pacman-contrib unrar unzip p7zip usbutils wget xdg-user-dirs firefox deluge deluge-gtk foliate gimp inkscape keepassxc libreoffice-fresh vlc"
+declare PACKAGES="lvm2 sudo base-devel screen git python python-pip cpupower thermald dhcpcd dhclient flatpak parted htop lshw man-db man-pages texinfo mc nano net-tools network-manager-applet networkmanager nm-connection-editor ntfs-3g pacman-contrib unrar unzip p7zip usbutils wget xdg-user-dirs firefox deluge deluge-gtk foliate gimp inkscape keepassxc libreoffice-fresh vlc"
 
 declare ADDITIONAL_PACKAGES="virtualbox jre-openjdk vnstat xsane cups clamav moreutils gparted"
 
 declare BOOTLOADER_PACKAGES="grub intel-ucode amd-ucode"
 
-declare DISPLAY_MANAGER="lightdm"
-declare DISPLAY_MANAGER_AUR="lightdm-settings lightdm-slick-greeter"
-
 declare DE_PACKAGES="xorg xorg-server xfce4 xfce4-goodies"
 declare DE_DEPENDENT_PACKAGES="eom evolution evolution-on file-roller atril gvfs gvfs-mtp gufw pavucontrol pulseaudio seahorse"
 
-declare AUR_PACKAGES="cpupower-gui-git nano-syntax-highlighting"
+declare AUR_PACKAGES="lightdm-settings cpupower-gui-git nano-syntax-highlighting"
 declare ADDITIONAL_AUR_PACKAGES="ttf-ms-fonts"
 
-declare VIDEO_DRIVERS="xf86-video-intel xf86-video-nouveau xf86-video-ati xf86-video-amdgpu nvidia nvidia-390xx"
+declare DISPLAY_MANAGER="lightdm"
+
+declare GREETER=""
+declare GREETER_AUR="lightdm-slick-greeter"
+declare SELECTED_GREETER=""
+
+declare VIDEO_DRIVER="xf86-video-intel xf86-video-nouveau xf86-video-ati xf86-video-amdgpu nvidia"
+declare VIDEO_DRIVER_AUR="nvidia-390xx"
 declare SELECTED_VIDEO_DRIVER=""
 
 #Warning: This variable is also modified from the pkg_select function!
@@ -209,7 +215,7 @@ function yes_no () {
 
     read -e -r ANSWER
 
-        while ! output=$([ "$ANSWER" == "y" ] || [ "$ANSWER" == "Y" ] || [ "$ANSWER" == "n" ] || [ "$ANSWER" == "N" ]); do
+    while ! output=$([ "$ANSWER" == "y" ] || [ "$ANSWER" == "Y" ] || [ "$ANSWER" == "n" ] || [ "$ANSWER" == "N" ]); do
 
         prompt_warning "Wrong answer!"
         printf "Please try again: "
@@ -255,23 +261,43 @@ function partition_check () {
 
 function print_packages () {
 
-    #TODO: Print package fonksiyonu düzenlenecek
-    
     clear
+    
     prompt_warning "Current selected packages are:"
+    
     printf "${PURPLE}Core Packages: ${NOCOLOUR}"
     prompt_info "$CORE_PACKAGES"
     echo
     
-    printf "${PURPLE}Additional Packages: ${NOCOLOUR}"
-    prompt_info "$ADDITIONAL_PACKAGES"
+    printf "${PURPLE}Packages: ${NOCOLOUR}"
+    prompt_info "$PACKAGES"
     echo
     
-    printf "${PURPLE}AUR Packages: ${NOCOLOUR}"
+    printf "${PURPLE}Bootloader Packages: ${NOCOLOUR}"
+    prompt_info "$BOOTLOADER_PACKAGES"
+    echo
+    
+    printf "${PURPLE}Display Manager: ${NOCOLOUR}"
+    prompt_info "$DISPLAY_MANAGER"
+    echo
+    
+    printf "${PURPLE}Desktop Environment Packages: ${NOCOLOUR}"
+    prompt_info "$DE_PACKAGES"
+    echo
+    
+    printf "${PURPLE}Desktop Environment Dependent Packages: ${NOCOLOUR}"
+    prompt_info "$DE_DEPENDENT_PACKAGES"
+    echo
+    
+    printf "${PURPLE}Aur Packages: ${NOCOLOUR}"
     prompt_info "$AUR_PACKAGES"
     echo
     
-    printf "${PURPLE}SELECTED VIDEO_DRIVER: ${NOCOLOUR}"
+    printf "${PURPLE}Greeter: ${NOCOLOUR}"
+    prompt_info "$SELECTED_GREETER"
+    echo
+    
+    printf "${PURPLE}Video Driver: ${NOCOLOUR}"
     prompt_info "$SELECTED_VIDEO_DRIVER"
     echo
 }
@@ -281,25 +307,17 @@ function print_packages () {
 #And asks the user to include each of the packages in the original set or not
 function pkg_select () {
 
-    declare PACKAGES=""
+    declare SELECTION=""
     print_packages
 
     for i in $1; do
     
         prompt_different "Do you want to install $i as well? (y/n):"
-        read -e -r ANSWER
-        while ! output=$([ "$ANSWER" == "y" ] || [ "$ANSWER" == "Y" ] || [ "$ANSWER" == "n" ] || [ "$ANSWER" == "N" ]); do
-        
-            prompt_warning "Wrong answer!"
-            printf "Please try again: "
-            read -e -r ANSWER
-        done
-        
-        if [ "$ANSWER" == "Y" ]; then ANSWER="y"; fi
+        yes_no
         
         if [ "$ANSWER" == "y" ]; then
         
-            PACKAGES+=" $i"
+            SELECTION+=" $i"
             
             if [ "$i" == "clamav" ]; then
             
@@ -308,12 +326,12 @@ function pkg_select () {
         fi
     done
     
-    PKG_SELECT="$PACKAGES"
+    PKG_SELECT="$SELECTION"
 }
 
 
 # ---------------------------------------------------------------------------- #
-#                             Second Phase Function                            #
+#                                 Second Phase                                 #
 # ---------------------------------------------------------------------------- #
 
 #Generate a file called "setup_second_phase.sh"
@@ -396,7 +414,7 @@ function failure () {
 echo "#The aur function (will be called in chroot)
 function aur () {
 
-    #Make a github directory and clone yay in user priviliges
+    #Make a github directory and clone yay with user priviliges
     function clone_yay () {
 
         check_connection
@@ -412,7 +430,7 @@ function aur () {
     prompt_info \"Generating home directories...\"
     xdg-user-dirs-update
     
-    #Export this function to call it in the user's shell
+    #Export clone_yay function to call it in the user's shell
     export -f clone_yay
     prompt_info \"Cloning yay...\"
     su \"$USER_NAME\" /bin/bash -c clone_yay
@@ -441,23 +459,25 @@ echo '    #Install aur packages
     find -type f -name "PKGBUILD" -exec makepkg -si --noconfirm {} \;
 '
 
-echo "    #Arrange greeter
-    prompt_info \"Arranging greeter...\"
-    sed \"s/#greeter-session=example-gtk-gnome/greeter-session=lightdm-slick-greeter/g\" /etc/lightdm/lightdm.conf > tmp.txt
-    sleep 1s
-    #Check if tmp.txt's length is zero
-    if ! [ -n \"$(cat tmp.txt)\" ]; then
+echo "    #Check if /etc/lightdm directory exists
+    if [ -d \"/etc/lightdm\" ]; then
     
-        prompt_info \"Backing up /etc/lightdm/lightdm.conf to /etc/lightdm/lightdm.conf.backup...\"
-        mv /etc/lightdm/lightdm.conf /etc/lightdm/lightdm.conf.backup
-        mv tmp.txt /etc/lightdm/lightdm.conf
-    else
-    
-        prompt_warning \"Cannot modify /etc/lightdm/lightdm.conf file.\"
-        prompt_warning \"You have to modify it manually.\"
-        prompt warning \"greeter-session= should be equal to greeter_session=lightdm-slick-greeter (which is under the [Seat:*] section).\"
-        prompt_warning \"Press any key to continue...\"
-        read -e -r TMP
+        prompt_info \"Enabling lightdm slick greeter...\"
+        declare LIGHTDM_CONF=\"\"
+        LIGHTDM_CONF=\$(sed \"s/#greeter-session=example-gtk-gnome/greeter-session=lightdm-slick-greeter/g\" /etc/lightdm/lightdm.conf)
+        if [ -n \"\$LIGHTDM_CONF\" ]; then
+        
+            prompt_info \"Backing up /etc/lightdm/lightdm.conf to /etc/lightdm/lightdm.conf.backup...\"
+            mv /etc/lightdm/lightdm.conf /etc/lightdm/lightdm.conf.backup
+            mv tmp.txt /etc/lightdm/lightdm.conf
+        else
+        
+            prompt_warning \"Cannot modify /etc/lightdm/lightdm.conf file.\"
+            prompt_warning \"You have to modify it manually.\"
+            prompt warning \"greeter-session= should be equal to greeter_session=lightdm-slick-greeter (which is under the [Seat:*] section).\"
+            prompt_warning \"Press any key to continue...\"
+            read -e -r TMP
+        fi
     fi
 
     #Enabling services
@@ -512,7 +532,7 @@ chmod +x setup_second_phase.sh
 #                                  First Phase                                 #
 # ---------------------------------------------------------------------------- #
 
-#Assumes keyboard layout setted
+#Assuming keyboard layout has been set
 
 clear
 prompt_different "This script is for installing archlinux on an empty (or semi-empty) disk."
@@ -523,14 +543,8 @@ prompt_warning "Use Ctrl-Z in dire situations and reboot your system afterwards 
 #Check the internet connection before attempting anything
 check_connection
 
-#Set system clock
+#Set time synchronization active
 timedatectl set-ntp true
-
-#Arrange timezone
-timedatectl list-timezones | column
-prompt_question "Please specify your timezone (ex: de-latin1): "
-read -e -r TIMEZONE
-timedatectl set-timezone "$TIMEZONE"
 
 #Get device name
 while true; do
@@ -874,7 +888,7 @@ else #Manuel partition selection
             read -e -r GRUB_PARTITION_NUMBER
             
             #Check if number and check if exceeds the maximum partition number
-            if output=$( [[ ! $GRUB_PARTITION_NUMBER =~ ^[0-9]+$ ]] || (( $GRUB_PARTITION_NUMBER > $max_partition )) ); then
+            if output=$( [[ ! $GRUB_PARTITION_NUMBER =~ ^[0-9]+$ ]] || (( GRUB_PARTITION_NUMBER > max_partition )) ); then
             
                 prompt_warning "Wrong number!"
                 prompt_warning "Please re-enter."
@@ -1003,7 +1017,7 @@ parted "$DISK" --script "print"
 sleep 7s
 
 
-# -------------------------------- Encrypting -------------------------------- #
+# ---------------------------------- Encrypt --------------------------------- #
 #Scheme used:
 #https://wiki.archlinux.org/title/Dm-crypt/Encrypting_an_entire_system#LVM_on_LUKS
 
@@ -1039,7 +1053,7 @@ if [ "$IS_ENCRYPT" == "true" ]; then
 fi
 
 
-# ------------------------------- File systems ------------------------------- #
+# ------------------------------- File Systems ------------------------------- #
 prompt_info "Making file systems..."
 
 if output=$([ "$IS_UEFI" == "true" ] && [ "$IS_ESP_FORMAT" == "true" ]); then
@@ -1070,11 +1084,11 @@ fi
 # --------------------------------- Mounting --------------------------------- #
 prompt_info "Mounting..."
 
-#Mount system
+#System
 mkdir -p "/mnt/$DEVICE"
 mount "$SYSTEM_PARTITION" "/mnt/$DEVICE"
 
-#Mount efi
+#ESP
 #https://wiki.archlinux.org/title/EFI_system_partition#Mount_the_partition
 if [ "$IS_UEFI" == "true" ]; then
 
@@ -1082,11 +1096,11 @@ if [ "$IS_UEFI" == "true" ]; then
     mount "$ESP" "/mnt/$DEVICE/efi"
 fi
 
-#Mount boot
+#Boot
 mkdir -p "/mnt/$DEVICE/boot"
 mount "$BOOT_PARTITION" "/mnt/$DEVICE/boot"
 
-#Mount home
+#Home
 if [ "$IS_SEPERATE" == "true" ]; then
     
     mkdir -p "/mnt/$DEVICE/home"
@@ -1094,4 +1108,170 @@ if [ "$IS_SEPERATE" == "true" ]; then
 fi
 
 
+# ----------------------------- Package Selection ---------------------------- #
+pkg_select "$ADDITIONAL_PACKAGES"
+PACKAGES+="$PKG_SELECT"
+
+pkg_select "$ADDITIONAL_AUR_PACKAGES"
+AUR_PACKAGES+="$PKG_SELECT"
+
+
+print_packages
+
+
+# ----------------------------- Greeter Selection ---------------------------- #
+#Print Greeters
+prompt_info "Available Greeters are: "
+declare -i max_=0
+declare -i aur_part_=0
+for i in $GREETER; do
+
+    max_+=1
+    printf "${PURPLE}%s (%s) ${NC}" "$i" "$max_"
+done
+
+aur_part_=$max_+1
+for i in $GREETER_AUR; do
+
+    max_+=1
+    printf "${PURPLE}%s (%s) ${NC}" "$i" "$max_"
+done
+echo
+
+#Get Greeter
+declare SELECTION_=""
+printf "Please select one: "
+read -e -r SELECTION_
+while output=$( [[ ! $SELECTION_ =~ ^[0-9]+$ ]] || (( SELECTION_ > max_ )) ); do
+
+    prompt_warning "Wrong number!"
+    printf "Please select one: "
+    read -e -r SELECTION_
+done
+
+#Include it in the installation
+declare -i current_=0
+for i in $GREETER $GREETER_AUR; do
+
+    current_+=1
+    if [ "$current_" == "$SELECTION_" ]; then
+    
+        if (( current_ < aur_part_ )); then
+        
+            PACKAGES=" $i"
+            SELECTED_GREETER="$i"
+            break
+        elif (( current_ >= aur_part_ )); then
+        
+            AUR_PACKAGES+=" $i"
+            SELECTED_GREETER="$i"
+            break
+        fi
+    fi
+done
+
+print_packages
+
+# -------------------------- Video Driver Selection -------------------------- #
+#Get model
+prompt_info "Your graphics card model is: "
+lspci -v | grep -A1 -e VGA -e 3D
+
+#Print drivers
+prompt_info "Available video drivers are: "
+declare -i max=0
+declare -i aur_part=0
+for driver in $VIDEO_DRIVER; do
+
+    max+=1
+    printf "${PURPLE}%s (%s) ${NC}" "$driver" "$max"
+done
+
+aur_part+=$max+1
+for driver in $VIDEO_DRIVER_AUR; do
+
+    max+=1
+    printf "${PURPLE}%s (%s) ${NC}" "$driver" "$max"
+done
+echo
+
+#Get driver
+declare SELECTION=""
+printf "Please select one: "
+read -e -r SELECTION
+while output=$( [[ ! $SELECTION =~ ^[0-9]+$ ]] || (( SELECTION > max )) ); do
+
+    prompt_warning "Wrong number!"
+    printf "Please select one: "
+    read -e -r SELECTION
+done
+
+#Include it in the installation
+declare -i current=0
+for i in $VIDEO_DRIVER $VIDEO_DRIVER_AUR; do
+
+    current+=1
+    if [ "$current" == "$SELECTION" ]; then
+    
+        if (( current < aur_part )); then
+        
+            PACKAGES=" $i"
+            SELECTED_VIDEO_DRIVER="$i"
+            break
+        elif (( current >= aur_part )); then
+        
+            AUR_PACKAGES+=" $i"
+            SELECTED_VIDEO_DRIVER="$i"
+            break
+        fi
+    fi
+done
+
+print_packages
+
+
+#Sort mirrorslist
+check_connection
+prompt_different "Do you want to sort the mirror list to make the downloads faster? (y/n) - might take a while - :"
+yes_no
+if [ "$ANSWER" == "y" ]; then
+
+    clear
+    prompt_info "Sorting mirror list..."
+    reflector --verbose --sort rate --protocol https --latest 55 --save /etc/pacman.d/mirrorlist
+fi
+
+
+# ------------------------------- Installation ------------------------------- #
+check_connection
+for i in {5..0}; do
+
+    clear
+    print_packages
+    printf "\n"
+    prompt_warning "Download will start in $i"
+    sleep 1s
+done
+
+pacstrap /mnt/"$DEVICE" $CORE_PACKAGES $PACKAGES $BOOTLOADER_PACKAGES $DISPLAY_MANAGER $DE_PACKAGES $DE_DEPENDENT_PACKAGES
+
+#Generate fstab
+prompt_info "Generating fstab..."
+genfstab -U /mnt/"$DEVICE" >> /mnt/"$DEVICE"/etc/fstab
+
+
+# ---------------------------------------------------------------------------- #
+#                                     Setup                                    #
+# ---------------------------------------------------------------------------- #
+function setup () {
+
+    #Set timezone
+    declare TIMEZONE=""
+    timedatectl list-timezones | column
+    prompt_question "Please specify your timezone (Ex: Europe/Zurich or Cuba): "
+    read -e -r TIMEZONE
+    ln -sf /usr/share/zoneinfo/"$TIMEZONE" /etc/localtime
+    
+    #TODO: Arrange locals (if non-zero)
+}
 
