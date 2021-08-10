@@ -37,8 +37,10 @@
 
 declare DISK_CHECK=""
 declare PART_CHECK=""
+declare -i NUMBER_CHECK=0
 declare PKG_SELECT=""
 declare ANSWER=""
+declare SELECTION=""
 
 declare PARTITION_TABLE=""
 declare DEVICE=""
@@ -259,6 +261,21 @@ function partition_check () {
 }
 
 
+function number_check () {
+
+    declare max_=0
+    max_=$1
+    
+    read -e -r NUMBER_CHECK
+    while output=$( [[ ! $NUMBER_CHECK =~ ^[0-9]+$ ]] || (( NUMBER_CHECK > max_ )) ); do
+    
+        prompt_warning "Wrong number!"
+        prompt_warning "Please re-enter."
+        sleep 2s
+    done
+}
+
+
 function print_packages () {
 
     clear
@@ -293,12 +310,10 @@ function print_packages () {
     prompt_info "$AUR_PACKAGES"
     echo
     
-    printf "${PURPLE}Greeter: ${NOCOLOUR}"
-    prompt_info "$SELECTED_GREETER"
+    prompt_warning "Greeter: $SELECTED_GREETER"
     echo
     
-    printf "${PURPLE}Video Driver: ${NOCOLOUR}"
-    prompt_info "$SELECTED_VIDEO_DRIVER"
+    prompt_warning "Video Driver: $SELECTED_VIDEO_DRIVER"
     echo
 }
 
@@ -307,7 +322,7 @@ function print_packages () {
 #And asks the user to include each of the packages in the original set or not
 function pkg_select () {
 
-    declare SELECTION=""
+    declare SELECTION_=""
     print_packages
 
     for i in $1; do
@@ -317,7 +332,7 @@ function pkg_select () {
         
         if [ "$ANSWER" == "y" ]; then
         
-            SELECTION+=" $i"
+            SELECTION_+=" $i"
             
             if [ "$i" == "clamav" ]; then
             
@@ -326,9 +341,64 @@ function pkg_select () {
         fi
     done
     
-    PKG_SELECT="$SELECTION"
+    PKG_SELECT="$SELECTION_"
 }
 
+
+function choose_one () {
+
+    declare MESSAGE=""
+    declare OFFICIAL_PKGS=""
+    declare AUR_PKGS=""
+    
+    MESSAGE="$1"
+    OFFICIAL_PKGS="$2"
+    AUR_PKGS="$3"
+
+    #Print packages
+    prompt_info "%s" "$MESSAGE"
+    
+    declare -i max=0
+    for i in $OFFICIAL_PKGS; do
+    
+        max+=1
+        printf "${PURPLE}%s (%s) ${NC}" "$i" "$max"
+    done
+    
+    declare -i aur_part=0
+    aur_part+=$max+1
+    for i in $AUR_PKGS; do
+    
+        max+=1
+        printf "${PURPLE}%s (%s) ${NC}" "$i" "$max"
+    done
+    echo
+    
+    #Selection
+    printf "Please choose one: "
+    number_check "$max"
+    
+    #Include it in the installation
+    declare -i current=0
+    for i in $OFFICIAL_PKGS $AUR_PKGS; do
+    
+        current+=1
+        if [ "$current" == "$NUMBER_CHECK" ]; then
+        
+            if (( current < aur_part )); then
+            
+                PACKAGES=" $i"
+                break
+            elif (( current >= aur_part )); then
+            
+                AUR_PACKAGES+=" $i"
+                break
+            fi
+            
+            SELECTION="$i"
+        fi
+    done
+}
 
 # ---------------------------------------------------------------------------- #
 #                                 Second Phase                                 #
@@ -430,6 +500,10 @@ function aur () {
     prompt_info \"Generating home directories...\"
     xdg-user-dirs-update
     
+    #Install go for yay
+    prompt_info \"Installing go... (for aur helper -yay-)\"
+    pacman -S --noconfirm go
+    
     #Export clone_yay function to call it in the user's shell
     export -f clone_yay
     prompt_info \"Cloning yay...\"
@@ -462,19 +536,20 @@ echo '    #Install aur packages
 echo "    #Check if /etc/lightdm directory exists
     if [ -d \"/etc/lightdm\" ]; then
     
-        prompt_info \"Enabling lightdm slick greeter...\"
+        prompt_info \"Enabling $SELECTED_GREETER...\"
         declare LIGHTDM_CONF=\"\"
-        LIGHTDM_CONF=\$(sed \"s/#greeter-session=example-gtk-gnome/greeter-session=lightdm-slick-greeter/g\" /etc/lightdm/lightdm.conf)
+        LIGHTDM_CONF=\$(sed \"s/#greeter-session=example-gtk-gnome/greeter-session=$SELECTED_GREETER/g\" /etc/lightdm/lightdm.conf)
+        sleep 1s
         if [ -n \"\$LIGHTDM_CONF\" ]; then
         
             prompt_info \"Backing up /etc/lightdm/lightdm.conf to /etc/lightdm/lightdm.conf.backup...\"
             mv /etc/lightdm/lightdm.conf /etc/lightdm/lightdm.conf.backup
-            mv tmp.txt /etc/lightdm/lightdm.conf
+            echo \"\$LIGHTDM_CONF\" > /etc/lightdm/lightdm.conf
         else
         
             prompt_warning \"Cannot modify /etc/lightdm/lightdm.conf file.\"
             prompt_warning \"You have to modify it manually.\"
-            prompt warning \"greeter-session= should be equal to greeter_session=lightdm-slick-greeter (which is under the [Seat:*] section).\"
+            prompt warning \"greeter-session=example-gtk-gnome should be equal to greeter_session=$SELECTED_GREETER (which is under the [Seat:*] section).\"
             prompt_warning \"Press any key to continue...\"
             read -e -r TMP
         fi
@@ -484,7 +559,7 @@ echo "    #Check if /etc/lightdm directory exists
     prompt_info \"Enabling services...\"
     for i in $SERVICES; do
         
-        systemctl enable $i || {prompt_warning \"Cannot enable $i service!\"; echo \"\"; echo \"$i\" >> /disabled_services.txt; prompt_warning \"Service added to /disabled_services.txt, Please enable it manually.\"; }
+        systemctl enable \$i || {prompt_warning \"Cannot enable \$i service!\"; echo \"\"; echo \"\$i\" >> /disabled_services.txt; prompt_warning \"Service added to /disabled_services.txt, Please enable it manually.\"; }
     done
 
     #Generate initramfs
@@ -532,7 +607,7 @@ chmod +x setup_second_phase.sh
 #                                  First Phase                                 #
 # ---------------------------------------------------------------------------- #
 
-#Assuming keyboard layout has been set
+#Assuming keyboard layout has already been set
 
 clear
 prompt_different "This script is for installing archlinux on an empty (or semi-empty) disk."
@@ -596,9 +671,9 @@ fi
 #You can visit the below link for additional information
 #https://wiki.gentoo.org/wiki/Handbook:AMD64/Installation/Disks#Partition_tables
 
-#Get disk size and subtract the extension
+#Get disk size in MiB and subtract the extension
 DISK_SIZE_MIB=$(parted "$DISK" --script "u mib" \ "print" | grep "Disk $DISK:" | awk '{print $3}' | sed s/[A-Za-z]//g)
-#Convert to TiB
+#Convert it to TiB
 DISK_SIZE_TIB=$(( DISK_SIZE_MIB/(1024*1024) ))
 
 #Wait before using parted again in case the disk is old
@@ -870,36 +945,22 @@ else #Manuel partition selection
     
     
     #BIOS GRUB partition
-    #Get last partition number
-    max_partition=$(parted $DISK --script print | awk '{print $1}' | tail -1)
-    
-    #Wait before using parted again in case the disk is old
-    sleep 2s
-    
     if output=$([ "$PARTITION_TABLE" == "gpt" ] && [ "$IS_UEFI" == "false" ]); then
     
-        declare GRUB_PARTITION_NUMBER=""
-        while true; do
-    
-            clear
-            parted --script "$DISK" "print"
-            
-            prompt_question "Please specify the number for the Grub parition (1mib partition advised): "
-            read -e -r GRUB_PARTITION_NUMBER
-            
-            #Check if number and check if exceeds the maximum partition number
-            if output=$( [[ ! $GRUB_PARTITION_NUMBER =~ ^[0-9]+$ ]] || (( GRUB_PARTITION_NUMBER > max_partition )) ); then
-            
-                prompt_warning "Wrong number!"
-                prompt_warning "Please re-enter."
-                sleep 2s
-            else
-            
-                parted "$DISK" --script "set $GRUB_PARTITION_NUMBER bios_grub on"
-                sleep 2s
-                break
-            fi
-        done
+        declare -i last_partition=0
+        declare PRINT=""
+        
+        PRINT=$(parted --script "$DISK" "print")
+        last_partition=$(echo "$PRINT" | awk '{print $1}' | tail -1)
+        
+        clear
+        echo "$PRINT"
+        
+        prompt_question "Please specify the number for the Grub parition (1mib partition advised): "
+        number_check "$last_partition"
+        
+        parted "$DISK" --script "set $NUMBER_CHECK bios_grub on"
+        sleep 2s
     fi
     
     #Get ESP
@@ -933,7 +994,6 @@ else #Manuel partition selection
                 prompt_warning "Please re-enter!"
                 prompt_warning "You can always quit with Ctrl-C or Ctrl-Z if needed."
                 sleep 2s
-                clear
             fi
         done
     fi
@@ -1121,54 +1181,8 @@ print_packages
 
 # ----------------------------- Greeter Selection ---------------------------- #
 #Print Greeters
-prompt_info "Available Greeters are: "
-declare -i max_=0
-declare -i aur_part_=0
-for i in $GREETER; do
-
-    max_+=1
-    printf "${PURPLE}%s (%s) ${NC}" "$i" "$max_"
-done
-
-aur_part_=$max_+1
-for i in $GREETER_AUR; do
-
-    max_+=1
-    printf "${PURPLE}%s (%s) ${NC}" "$i" "$max_"
-done
-echo
-
-#Get Greeter
-declare SELECTION_=""
-printf "Please select one: "
-read -e -r SELECTION_
-while output=$( [[ ! $SELECTION_ =~ ^[0-9]+$ ]] || (( SELECTION_ > max_ )) ); do
-
-    prompt_warning "Wrong number!"
-    printf "Please select one: "
-    read -e -r SELECTION_
-done
-
-#Include it in the installation
-declare -i current_=0
-for i in $GREETER $GREETER_AUR; do
-
-    current_+=1
-    if [ "$current_" == "$SELECTION_" ]; then
-    
-        if (( current_ < aur_part_ )); then
-        
-            PACKAGES=" $i"
-            SELECTED_GREETER="$i"
-            break
-        elif (( current_ >= aur_part_ )); then
-        
-            AUR_PACKAGES+=" $i"
-            SELECTED_GREETER="$i"
-            break
-        fi
-    fi
-done
+choose_one "Available Greeters are: " "$GREETER" "$GREETER_AUR"
+SELECTED_GREETER="$SELECTION"
 
 print_packages
 
@@ -1177,55 +1191,8 @@ print_packages
 prompt_info "Your graphics card model is: "
 lspci -v | grep -A1 -e VGA -e 3D
 
-#Print drivers
-prompt_info "Available video drivers are: "
-declare -i max=0
-declare -i aur_part=0
-for driver in $VIDEO_DRIVER; do
-
-    max+=1
-    printf "${PURPLE}%s (%s) ${NC}" "$driver" "$max"
-done
-
-aur_part+=$max+1
-for driver in $VIDEO_DRIVER_AUR; do
-
-    max+=1
-    printf "${PURPLE}%s (%s) ${NC}" "$driver" "$max"
-done
-echo
-
-#Get driver
-declare SELECTION=""
-printf "Please select one: "
-read -e -r SELECTION
-while output=$( [[ ! $SELECTION =~ ^[0-9]+$ ]] || (( SELECTION > max )) ); do
-
-    prompt_warning "Wrong number!"
-    printf "Please select one: "
-    read -e -r SELECTION
-done
-
-#Include it in the installation
-declare -i current=0
-for i in $VIDEO_DRIVER $VIDEO_DRIVER_AUR; do
-
-    current+=1
-    if [ "$current" == "$SELECTION" ]; then
-    
-        if (( current < aur_part )); then
-        
-            PACKAGES=" $i"
-            SELECTED_VIDEO_DRIVER="$i"
-            break
-        elif (( current >= aur_part )); then
-        
-            AUR_PACKAGES+=" $i"
-            SELECTED_VIDEO_DRIVER="$i"
-            break
-        fi
-    fi
-done
+choose_one "Available video drivers are: " "$VIDEO_DRIVER" "$VIDEO_DRIVER_AUR"
+SELECTED_VIDEO_DRIVER="$SELECTION"
 
 print_packages
 
@@ -1244,12 +1211,11 @@ fi
 
 # ------------------------------- Installation ------------------------------- #
 check_connection
+echo
 for i in {5..0}; do
 
-    clear
-    print_packages
-    printf "\n"
-    prompt_warning "Download will start in $i"
+    prompt_warning "Installation will start in: "
+    prompt_different "$i\033[0K\r"
     sleep 1s
 done
 
@@ -1265,13 +1231,185 @@ genfstab -U /mnt/"$DEVICE" >> /mnt/"$DEVICE"/etc/fstab
 # ---------------------------------------------------------------------------- #
 function setup () {
 
-    #Set timezone
+    #Home directories
+    prompt_info "Generating home directories..."
+    xdg-user-dirs-update
+    
+    #Timezone
+    declare LIST=""
+    declare LIST_RAW=""
     declare TIMEZONE=""
-    timedatectl list-timezones | column
-    prompt_question "Please specify your timezone (Ex: Europe/Zurich or Cuba): "
-    read -e -r TIMEZONE
+    declare max=""
+    
+    LIST_RAW="$(timedatectl list-timezones)"
+    LIST="$(echo "$LIST_RAW" | cat -n)"
+    max="$(echo "$LIST" | tail -1 | awk '{print $1}')"
+    
+    prompt_different "Please find your timezone in the list."
+    prompt_info "About to list timezones... (you can quit the listing mode with 'q' & use pg up-down)"
+    prompt_warning "Press any key to continue..."
+    read -e -r TMP
+    
+    echo "$LIST" | less
+    prompt_question "Please specify your timezone: "
+    number_check "max"
+    
+    TIMEZONE=$(echo "$LIST_RAW" | head -"$NUMBER_CHECK" | tail -1)
+    prompt_info "Setting timezone..."
     ln -sf /usr/share/zoneinfo/"$TIMEZONE" /etc/localtime
     
-    #TODO: Arrange locals (if non-zero)
+    #Locales
+    prompt_different "Please uncomment the needed locales (en_US.UTF-8 UTF-8, YOUR_LOCALE) in the file that is going to open."
+    prompt_different "Press Ctrl-S to save and Ctrl-X to exit."
+    prompt_warning "Press any key to continue..."
+    read -e -r TMP
+    prompt_info "Generating locales..."
+    nano /etc/locale.gen
+    loale-gen
+    
+    #Locale.conf
+    prompt_info "Making /etc/locale.conf file..."
+    printf "LANG=en_US.UTF-8" > /etc/locale.conf
+    
+    #Keymap
+    prompt_question "Have you set your keyboard layout? (y/n): "
+    yes_no
+    if [ "$ANSWER" == "y" ]; then
+    
+        prompt_different "Please write your keyboard layout in the file that is going to open. (ex: KEYMAP=de-latin1)"
+        prompt_different "Press Ctrl-S to save and Ctrl-X to exit."
+        prompt_warning "Press any key to continue..."
+        read -e -r TMP
+        printf "KEYMAP=" > /etc/vconsole.conf
+        nano /etc/vconsole.conf
+    fi
+    
+    #Hostname
+    prompt_info "Generating /etc/hostname..."
+    printf "%s" "$DEVICE" > /etc/hostname
+    
+    #Hosts
+    prompt_info "Generating /etc/hosts..."
+    printf "127.0.0.1      localhost\n"
+    printf "::1            localhost\n"
+    printf "127.0.1.1      %s.localdomain    %s" "$DEVICE" "$DEVICE"
+    
+    #Initramfs
+    if [ "$IS_ENCRYPT" == "true" ]; then
+    
+        prompt_info "Arranging /etc/mkinitcpio.conf"
+        declare MKINITCPIO=""
+        MKINITCPIO=$(sed "s/HOOKS=(base udev autodetect modconf block filesystems keyboard fsck)/HOOKS=(base udev autodetect keyboard keymap consolefont modconf block encrypt lvm2 filesystems fsck)/g" /etc/mkinitcpio.conf)
+        
+        sleep 1s
+        
+        if [ -n "$MKINITCPIO" ]; then
+        
+            prompt_info "Backing up /etc/mkinitcpio.conf to /etc/mkinitcpio.conf.backup..."
+            mv /etc/mkinitcpio.conf /etc/mkinitcpio.conf.backup
+            echo "$MKINITCPIO" > /etc/mkinitcpio.conf
+        else
+        
+            prompt_warning "Cannot modify /etc/mkinitcpio.conf!"
+            prompt_warning "You have to modify it manually."
+            
+            echo "HOOKS=(base udev autodetect keyboard keymap consolefont modconf block encrypt lvm2 filesystems fsck)" >> /etc/mkinitcpio.conf
+            
+            prompt_different "Needed format appended to the file."
+            prompt_different "Just comment the first 'HOOKS=...' line, and uncomment the second one."
+            prompt_warning "Press any key to continue..."
+            read -e -r TMP
+            
+            nano /etc/mkinitcpio.conf
+        fi
+    fi
+    
+    #Grub
+    prompt_info "Installing grub..."
+    grub-install --target=i386-pc "$DISK"
+    
+    #Configure grub
+    if [ "$IS_ENCRYPT" == "true" ]; then
+    
+        prompt_info "Arranging /etc/default/grub..."
+        declare ENCRYPT_UUID=""
+        ENCRYPT_UUID=$(blkid "$ENCRYPT_PARTITION" | awk '{print $2}' | sed s/\"//g)
+        
+        declare CMDLINE=""
+        CMDLINE=$(sed "s|GRUB_CMDLINE_LINUX=\"\"|GRUB_CMDLINE_LINUX=\"cryptdevice=$ENCRYPT_UUID:cryptlvm root=/dev/$VOLGROUP/root\"|g" /etc/default/grub)
+        
+        sleep 1s
+        
+        if [ -n "$CMDLINE" ]; then
+            
+            prompt_info "Backing up /etc/default/grub to /etc/default/grub.backup..."
+            mv /etc/default/grub /etc/default/grub.backup
+            echo "$CMDLINE" > /etc/default/grub
+        else
+        
+            prompt_warning "Cannot modify /etc/default/grub!"
+            prompt_warning "You have to modify it manually."
+            
+            echo "GRUB_CMDLINE_LINUX=\"cryptdevice=$ENCRYPT_UUID:cryptlvm root=/dev/$VOLGROUP/root\"" >> /etc/default/grub
+            
+            prompt_different "Needed format appended to the file."
+            prompt_different "Just comment the first 'GRUB_CMDLINE_LINUX=...' line, and uncomment the second one."
+            prompt_warning "Press any key to continue..."
+            read -e -r TMP
+            
+            nano /etc/default/grub
+        fi
+    fi
+    grub-mkconfig -o /boot/grub/grub.cfg
+    
+    #Enable sudo group
+    prompt_info "Enabling sudo group..."
+    declare SUDOERS=""
+    SUDOERS=$(sed "s/# %sudo/%sudo/g" /etc/sudoers)
+    
+    sleep 1s
+    
+    if [ -n "$SUDOERS" ]; then
+        
+        prompt_info "Backing up /etc/sudoers to /etc/sudoers.backup"
+        mv /etc/sudoers /etc/sudoers.backup
+        echo "$SUDOERS" > /etc/sudoers
+    else
+    
+        prompt_warning "Cannot modify /etc/sudoers!"
+        prompt_warning "You have to modify it manually."
+        
+        prompt_different "Just uncomment the '# %sudo...' line."
+        prompt_warning "Press any key to continue..."
+        read -e -r TMP
+        
+        nano /etc/sudoers
+    fi
+    groupadd sudo
+    
+    #Add user
+    clear
+    prompt_question "Enter a name for new user: "
+    read -e -r USER_NAME
+    while ! useradd -m -G sudo "$USER_NAME"; do
+
+        prompt_warning "Try again."
+    done
+    while ! passwd "$USER_NAME"; do
+
+    prompt_warning "Try again."
+    done
+    
+    #Setting root password
+    printf "Root "
+    while ! passwd root; do
+
+    prompt_warning "Try again."
+    done
+    
+    #Pass username to second phase
+    printf "%s" "$USER_NAME" > /user_name.txt
+    
+    prompt_warning "Installation complete!"
 }
 
