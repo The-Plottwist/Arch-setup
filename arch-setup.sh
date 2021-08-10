@@ -1181,7 +1181,7 @@ print_packages
 
 # ----------------------------- Greeter Selection ---------------------------- #
 #Print Greeters
-choose_one "Available Greeters are: " "$GREETER" "$GREETER_AUR"
+choose_one "Greeter packages are: " "$GREETER" "$GREETER_AUR"
 SELECTED_GREETER="$SELECTION"
 
 print_packages
@@ -1191,7 +1191,7 @@ print_packages
 prompt_info "Your graphics card model is: "
 lspci -v | grep -A1 -e VGA -e 3D
 
-choose_one "Available video drivers are: " "$VIDEO_DRIVER" "$VIDEO_DRIVER_AUR"
+choose_one "Driver Packages are: " "$VIDEO_DRIVER" "$VIDEO_DRIVER_AUR"
 SELECTED_VIDEO_DRIVER="$SELECTION"
 
 print_packages
@@ -1413,3 +1413,29 @@ function setup () {
     prompt_warning "Installation complete!"
 }
 
+#Export variables to be able to use in chroot
+export NUMBER_CHECK="$NUMBER_CHECK"
+export ANSWER="$ANSWER"
+export DEVICE="$DEVICE"
+export IS_ENCRYPT="$IS_ENCRYPT"
+export DISK="$DISK"
+export ENCRYPT_PARTITION="$ENCRYPT_PARTITION"
+export VOLGROUP="$VOLGROUP"
+
+#Export functions to be able to use in chroot
+export -f number_check
+export -f yes_no
+export -f prompt_info
+export -f prompt_warning
+export -f prompt_question
+export -f prompt_different
+
+export -f setup
+
+arch-chroot /mnt/"$DEVICE" /bin/bash -c "setup"
+
+#Setup second phase
+setup_second_phase
+
+#Finish
+prompt_warning "Please run ./setup_second_phase.sh command!"
