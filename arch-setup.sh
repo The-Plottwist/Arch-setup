@@ -21,8 +21,8 @@
 
 #Important note:
 #This script is consists of two phases.
-#First phase includes: Partitioning - Installing system - Installing bootloader & official packages - Adding a user account & Setting a root password
-#Second phase includes: Installing aur packages - Enabling services
+#First phase includes: Partitioning - Installing system - Installing bootloader & official packages - Adding user account & Setting a root password
+#Second phase includes: Installing aur helper & aur packages - Enabling services
 #You can find second phase function in the ...th line
 
 #Table of Contents
@@ -153,10 +153,15 @@ function prompt_path () {
 function unmount () {
 
     #Umount the selected disk
+    
+    prompt_info "Unmounting please wait..."
+    
     for i in $(lsblk -o mountpoints "$DISK" | grep / | sort --reverse); do
     
-        umount "$i" &>> /dev/null
+        umount "$i"
     done
+
+    sleep 2s
 
     #Swapoff if the selected disk has a swap partition
     declare SWAP_U=""
@@ -167,9 +172,11 @@ function unmount () {
         
         for i in $(echo $SWAP_U | awk '{print $2}'); do
         
-            swapoff "$i" &>> /dev/null
+            swapoff "$i"
         done
     fi
+
+    sleep 2s
 
     #Find if it has logical volumes
     declare LVM_U=""
@@ -180,9 +187,11 @@ function unmount () {
     
         for i in $(echo "$LVM_U" | awk '{print $2}'); do
         
-            cryptsetup close "$i" &>> /dev/null
+            cryptsetup close "$i"
         done
     fi
+
+    sleep 2s
 
     #Find if it has LUKS partitions
     declare LUKS_U=""
@@ -193,7 +202,7 @@ function unmount () {
     
         for i in $(echo "$LUKS_U" | awk '{print $2}'); do
         
-            cryptsetup close "$i" &>> /dev/null
+            cryptsetup close "$i"
         done
     fi
 
@@ -377,7 +386,7 @@ function choose_one () {
     for i in $OFFICIAL_PKGS; do
     
         max+=1
-        printf "${PURPLE}%s (%s) ${NC}" "$i" "$max"
+        printf "${PURPLE}%s (${LIGHT_CYAN}%s${PURPLE}) ${NOCOLOUR}" "$i" "$max"
     done
     
     declare -i aur_part=0
@@ -385,7 +394,7 @@ function choose_one () {
     for i in $AUR_PKGS; do
     
         max+=1
-        printf "${PURPLE}%s (%s) ${NC}" "$i" "$max"
+        printf "${PURPLE}%s (${LIGHT_CYAN}%s${PURPLE}) ${NOCOLOUR}" "$i" "$max"
     done
     echo
     
@@ -443,7 +452,11 @@ declare YELLOW='\033[1;33m'
 declare NOCOLOUR='\033[0m' #No Colour
 
 
-#Functions
+# ---------------------------------------------------------------------------- #
+#                                   Functions                                  #
+# ---------------------------------------------------------------------------- #
+
+
 function check_connection () {
 
     { ping wiki.archlinux.org -c 1 &>> /dev/null; } || failure \"No internet connection!\"
@@ -498,11 +511,15 @@ function failure () {
 echo "#The aur function (will be called in chroot)
 function aur () {
 
-    #Make a github directory and clone yay with user priviliges
+    #Make a github directory and clone yay (will be called in user's terminal)
     function clone_yay () {
 
+        #Generating home directories
+        prompt_info \"Generating home directories...\"
+        xdg-user-dirs-update
+
         check_connection
-        
+
         cd \"/home/$USER_NAME\" || failure \"Cannot change directory to /home/$USER_NAME.\"
         mkdir -p Git-Hub || failure \"/home/$USER_NAME/Git-Hub directory couldn't made.\"
         cd Git-Hub || failure \"Cannot change directory to /home/$USER_NAME/Git-Hub.\"
@@ -515,7 +532,7 @@ function aur () {
     xdg-user-dirs-update
     
     #Install go for yay
-    prompt_info \"Installing go... (for aur helper -yay-)\"
+    prompt_info \"Installing go for aur helper... -yay-\"
     pacman -S --noconfirm go
     
     #Export clone_yay function to call it in the user's shell
@@ -581,17 +598,23 @@ echo "    #Check if /etc/lightdm directory exists
     mkinitcpio -P
     
     #Return home
-    cd /home/\"$USER_NAME\"
+    cd \"/home/$USER_NAME\"
 
     prompt_warning \"AUR configuration complete!\"
 }
 "
 
+echo '
+# ---------------------------------------------------------------------------- #
+#                              Script starts here                              #
+# ---------------------------------------------------------------------------- #
+
+'
+
 echo '#Exporting variables to be able to use in chroot
 export LIGHT_RED="$LIGHT_RED"
 export YELLOW="$YELLOW"
 export NOCOLOUR="$NOCOLOUR"
-
 '
 
 echo "#Export functions to be able to use in chroot
@@ -601,7 +624,7 @@ export -f failure
 export -f aur
 
 #Run aur function
-arch-chroot /mnt/\"$DEVICE\" /bin/bash -c \"aur\"
+arch-chroot \"/mnt/$DEVICE\" /bin/bash -c \"aur\"
 
 prompt_warning \"ARCH SETUP FINISHED!!\"
 prompt_warning \"You can safely reboot now.\"
@@ -1006,7 +1029,7 @@ else #Manuel partition selection
                 current_+=1
     
                 prompt_info "Opening $i..."
-                cryptsetup open $i LUKS$current_
+                cryptsetup open "$i" LUKS$current_
             fi
         done
     else
@@ -1240,7 +1263,7 @@ print_packages
 
 #Sort mirrorslist
 check_connection
-prompt_different "Do you want to sort the mirror list to make the downloads faster? (y/n) - might take a while - :"
+printf "${LIGHT_GREEN}Do you want to sort the mirror list to make the downloads faster?${LIGHT_RED} - might take a while - ${LIGHT_GREEN}(y/n): ${NOCOLOUR}"
 yes_no
 if [ "$ANSWER" == "y" ]; then
 
@@ -1256,15 +1279,15 @@ echo
 for i in {5..0}; do
 
     prompt_warning "Installation will start in: "
-    prompt_different "$i\033[0K\r"
+    printf "${LIGHT_CYAN}$i${NOCOLOUR}\033[0K\r"
     sleep 1s
 done
 
-pacstrap /mnt/"$DEVICE" $CORE_PACKAGES $PACKAGES $BOOTLOADER_PACKAGES $DISPLAY_MANAGER $DE_PACKAGES $DE_DEPENDENT_PACKAGES
+#pacstrap "/mnt/$DEVICE" $CORE_PACKAGES $PACKAGES $BOOTLOADER_PACKAGES $DISPLAY_MANAGER $DE_PACKAGES $DE_DEPENDENT_PACKAGES
 
 #Generate fstab
 prompt_info "Generating fstab..."
-genfstab -U /mnt/"$DEVICE" >> /mnt/"$DEVICE"/etc/fstab
+#genfstab -U "/mnt/$DEVICE" >> "/mnt/$DEVICE/etc/fstab"
 
 
 # ---------------------------------------------------------------------------- #
@@ -1272,10 +1295,6 @@ genfstab -U /mnt/"$DEVICE" >> /mnt/"$DEVICE"/etc/fstab
 # ---------------------------------------------------------------------------- #
 function setup () {
 
-    #Home directories
-    prompt_info "Generating home directories..."
-    xdg-user-dirs-update
-    
     #Timezone
     declare LIST=""
     declare LIST_RAW=""
@@ -1287,7 +1306,8 @@ function setup () {
     max="$(echo "$LIST" | tail -1 | awk '{print $1}')"
     
     prompt_different "Please find your timezone in the list."
-    prompt_info "About to list timezones... (you can quit the listing mode with 'q' & use pg up-down)"
+    echo
+    printf "${YELLOW}About to list timezones... (you can quit the listing mode with${LIGHT_RED} q ${YELLOW}& use${LIGHT_RED} pg up-down${YELLOW})${NOCOLOUR}"
     prompt_warning "Press any key to continue..."
     read -e -r TMP
     
@@ -1301,7 +1321,9 @@ function setup () {
     
     #Locales
     prompt_different "Please uncomment the needed locales (en_US.UTF-8 UTF-8, YOUR_LOCALE) in the file that is going to open."
+    echo
     prompt_different "Press Ctrl-S to save and Ctrl-X to exit."
+    echo
     prompt_warning "Press any key to continue..."
     read -e -r TMP
     prompt_info "Generating locales..."
@@ -1318,7 +1340,9 @@ function setup () {
     if [ "$ANSWER" == "y" ]; then
     
         prompt_different "Please write your keyboard layout in the file that is going to open. (ex: KEYMAP=de-latin1)"
+        echo
         prompt_different "Press Ctrl-S to save and Ctrl-X to exit."
+        echo
         prompt_warning "Press any key to continue..."
         read -e -r TMP
         printf "KEYMAP=" > /etc/vconsole.conf
@@ -1357,7 +1381,9 @@ function setup () {
             echo "HOOKS=(base udev autodetect keyboard keymap consolefont modconf block encrypt lvm2 filesystems fsck)" >> /etc/mkinitcpio.conf
             
             prompt_different "Needed format appended to the file."
+            echo
             prompt_different "Just comment the first 'HOOKS=...' line, and uncomment the second one."
+            echo
             prompt_warning "Press any key to continue..."
             read -e -r TMP
             
@@ -1394,7 +1420,9 @@ function setup () {
             echo "GRUB_CMDLINE_LINUX=\"cryptdevice=$ENCRYPT_UUID:cryptlvm root=/dev/$VOLGROUP/root\"" >> /etc/default/grub
             
             prompt_different "Needed format appended to the file."
+            echo
             prompt_different "Just comment the first 'GRUB_CMDLINE_LINUX=...' line, and uncomment the second one."
+            echo
             prompt_warning "Press any key to continue..."
             read -e -r TMP
             
@@ -1421,6 +1449,7 @@ function setup () {
         prompt_warning "You have to modify it manually."
         
         prompt_different "Just uncomment the '# %sudo...' line."
+        echo
         prompt_warning "Press any key to continue..."
         read -e -r TMP
         
@@ -1463,6 +1492,12 @@ export DISK="$DISK"
 export ENCRYPT_PARTITION="$ENCRYPT_PARTITION"
 export VOLGROUP="$VOLGROUP"
 
+export YELLOW="$YELLOW"
+export LIGHT_RED="$LIGHT_RED"
+export LIGHT_CYAN="$LIGHT_CYAN"
+export LIGHT_GREEN="$LIGHT_GREEN"
+export NOCOLOUR="$NOCOLOUR"
+
 #Export functions to be able to use in chroot
 export -f number_check
 export -f yes_no
@@ -1473,7 +1508,7 @@ export -f prompt_different
 
 export -f setup
 
-arch-chroot /mnt/"$DEVICE" /bin/bash -c "setup"
+arch-chroot "/mnt/$DEVICE" /bin/bash -c "setup"
 
 #Setup second phase
 setup_second_phase
