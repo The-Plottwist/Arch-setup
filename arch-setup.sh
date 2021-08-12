@@ -37,7 +37,7 @@
 
 declare DISK_CHECK=""
 declare PART_CHECK=""
-declare -i NUMBER_CHECK=0
+declare NUMBER_CHECK=""
 declare PKG_SELECT=""
 declare ANSWER=""
 declare SELECTION=""
@@ -100,7 +100,7 @@ declare SERVICES="dhcpcd NetworkManager thermald cpupower lightdm"
 #declare RED='\033[0;31m'
 declare LIGHT_RED='\033[1;31m'
 #declare GREEN='\033[0;32m'
-#declare LIGHT_GREEN='\033[1;32m'
+declare LIGHT_GREEN='\033[1;32m'
 declare ORANGE='\033[0;33m'
 declare YELLOW='\033[1;33m'
 #declare BLUE='\033[0;34m'
@@ -129,7 +129,7 @@ function prompt_warning () {
 
 function prompt_info () {
 
-    printf "${YELLOW}%s${NOCOLOUR}\n" "$1"
+    printf "${YELLOW}\n%s\n${NOCOLOUR}\n" "$1"
 }
 
 
@@ -141,7 +141,12 @@ function prompt_question () {
 
 function prompt_different () {
 
-    printf "${ORANGE}%s${NOCOLOUR}" "$1"
+    printf "${LIGHT_GREEN}%s${NOCOLOUR}" "$1"
+}
+
+function prompt_path () {
+
+    printf "${LIGHT_CYAN}Please enter the${LIGHT_RED} PATH ${LIGHT_CYAN}for %s${NOCOLOUR}" "$1"
 }
 
 
@@ -150,9 +155,9 @@ function unmount () {
     #Umount the selected disk
     for i in $(lsblk -o mountpoints "$DISK" | grep / | sort --reverse); do
     
-        umount "$i"
+        umount "$i" &>> /dev/null
     done
-    
+
     #Swapoff if the selected disk has a swap partition
     declare SWAP_U=""
     SWAP_U=$(lsblk -o fstype,path "$DISK" | grep -i swap)
@@ -162,10 +167,10 @@ function unmount () {
         
         for i in $(echo $SWAP_U | awk '{print $2}'); do
         
-            swapoff "$i"
+            swapoff "$i" &>> /dev/null
         done
     fi
-    
+
     #Find if it has logical volumes
     declare LVM_U=""
     LVM_U=$(lsblk -o type,path "$DISK" | grep lvm)
@@ -175,10 +180,10 @@ function unmount () {
     
         for i in $(echo "$LVM_U" | awk '{print $2}'); do
         
-            cryptsetup close "$i"
+            cryptsetup close "$i" &>> /dev/null
         done
     fi
-    
+
     #Find if it has LUKS partitions
     declare LUKS_U=""
     LUKS_U=$(lsblk -o type,path "$DISK" | grep crypt)
@@ -188,12 +193,14 @@ function unmount () {
     
         for i in $(echo "$LUKS_U" | awk '{print $2}'); do
         
-            cryptsetup close "$i"
+            cryptsetup close "$i" &>> /dev/null
         done
     fi
-    
+
+    sleep 2s
+
     #And finally inform the kernel
-    partprobe
+    partprobe &>> /dev/null
 }
 
 
@@ -219,6 +226,7 @@ function yes_no () {
 
     while ! output=$([ "$ANSWER" == "y" ] || [ "$ANSWER" == "Y" ] || [ "$ANSWER" == "n" ] || [ "$ANSWER" == "N" ]); do
 
+        echo
         prompt_warning "Wrong answer!"
         printf "Please try again: "
         read -e -r ANSWER
@@ -270,13 +278,15 @@ function number_check () {
     while output=$( [[ ! $NUMBER_CHECK =~ ^[0-9]+$ ]] || (( NUMBER_CHECK > max_ )) ); do
     
         prompt_warning "Wrong number!"
-        prompt_warning "Please re-enter."
-        sleep 2s
+        printf "${LIGHT_CYAN}Please re-enter: ${NOCOLOUR}"
+        read -e -r NUMBER_CHECK
     done
 }
 
 
 function print_packages () {
+
+    #TODO: Paketlere link verilecek
 
     clear
     
@@ -318,17 +328,20 @@ function print_packages () {
 }
 
 
+function pkg_select () {
 #Takes additional package sets as an argument
 #And asks the user to include each of the packages in the original set or not
-function pkg_select () {
 
     declare SELECTION_=""
     print_packages
 
     for i in $1; do
     
-        prompt_different "Do you want to install $i as well? (y/n):"
+        printf "${LIGHT_GREEN}Do you want to install ${LIGHT_RED}%s ${LIGHT_GREEN}as well? (y/n)${LIGHT_GREEN}: ${NOCOLOUR}" "$i"
         yes_no
+        
+        #Delete the previous line
+        printf "\033[1A\033[2K\r"
         
         if [ "$ANSWER" == "y" ]; then
         
@@ -356,7 +369,9 @@ function choose_one () {
     AUR_PKGS="$3"
 
     #Print packages
-    prompt_info "%s" "$MESSAGE"
+    prompt_different "$MESSAGE"
+    echo
+    echo
     
     declare -i max=0
     for i in $OFFICIAL_PKGS; do
@@ -401,11 +416,10 @@ function choose_one () {
 }
 
 # ---------------------------------------------------------------------------- #
-#                                 Second Phase                                 #
+#                    Second Phase (Will be used at the end)                    #
 # ---------------------------------------------------------------------------- #
 
 #Generate a file called "setup_second_phase.sh"
-#This function will be used at the end.
 #Warning: Mix use of double quotes ("") and single quotes ('')
 function setup_second_phase () {
 
@@ -609,11 +623,23 @@ chmod +x setup_second_phase.sh
 
 #Assuming keyboard layout has already been set
 
+#Disclaimer
 clear
 prompt_different "This script is for installing archlinux on an empty (or semi-empty) disk."
+echo
+
 prompt_different "You can modify it to your needs, otherwise XFCE will be installed with a custom package set."
-prompt_warning "If you encounter a problem or want to stop the command, you can always press Ctrl-C to quit."
-prompt_warning "Use Ctrl-Z in dire situations and reboot your system afterwards as it doesn't actually stop the script."
+echo
+echo
+
+printf "${ORANGE}If you encounter a problem or want to stop the command, you can always press Ctrl-C to quit.${NOCOLOUR}\n"
+printf "${ORANGE}Use Ctrl-Z in dire situations and reboot your system afterwards as it doesn't actually stop the script.${NOCOLOUR}\n"
+echo
+
+prompt_warning "This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+See the GNU General Public License V3 for more details."
+echo
 
 #Check the internet connection before attempting anything
 check_connection
@@ -636,9 +662,7 @@ while true; do
     else
 
         prompt_warning "Names don't match!"
-        prompt_warning "Please re-enter."
-        sleep 2s
-        clear
+        echo
     fi
 done
 
@@ -646,17 +670,14 @@ done
 clear
 lsblk -o +path,partlabel | head -1
 lsblk -o +path,partlabel | grep "disk"
-prompt_question "Please enter the path for the disk you want to operate: "
+prompt_path "the disk you want to operate: "
 disk_check
 DISK="$DISK_CHECK"
 
-#Unmount just in case
 unmount
 
-clear
-
 #Check if system is UEFI
-if output=$(ls /sys/firmware/efi/efivars); then
+if [ -d /sys/firmware/efi/efivars ]; then
 
     prompt_info "System boot mode detected as UEFI."
     IS_UEFI="true"
@@ -692,7 +713,7 @@ fi
 #In the below link, you can find the answer for the question of - Why first partition generally starts from sector 2048 (1mib)? -
 #https://www.thomas-krenn.com/en/wiki/Partition_Alignment_detailed_explanation
 
-prompt_question "Do you want to use auto partitioning? - All data will be ERASED! - (y/n): "
+printf "${LIGHT_CYAN}Do you want to use auto partitioning? ${LIGHT_RED}- All data will be ERASED! -${LIGHT_CYAN} (y/n): ${NOCOLOUR}"
 yes_no
 if [ "$ANSWER" == "y" ]; then
 
@@ -724,7 +745,7 @@ if [ "$ANSWER" == "y" ]; then
     NEEDED_SIZE+=32768
 
     #If not enough space
-    if (( DISK_SIZE_MIB > NEEDED_SIZE )); then
+    if (( DISK_SIZE_MIB < NEEDED_SIZE )); then
     
         #Convert MiB to GiB
         NEEDED_SIZE=$((NEEDED_SIZE/1024))
@@ -776,8 +797,10 @@ if [ "$ANSWER" == "y" ]; then
             parted "$DISK" --script "set 1 boot on" \
                                     "set 1 esp on"
             
-            ESP="$DISK"1
+            IS_SEPERATE="true"
             IS_ESP_FORMAT="true"
+
+            ESP="$DISK"1
             BOOT_PARTITION="$DISK"2
             ENCRYPT_PARTITION="$DISK"3
         else
@@ -791,6 +814,9 @@ if [ "$ANSWER" == "y" ]; then
 
                 parted "$DISK" --script "set 1 bios_grub on"
                 
+
+                IS_SEPERATE="true"
+
                 BOOT_PARTITION="$DISK"2
                 ENCRYPT_PARTITION="$DISK"3
             else #Encrypt true, UEFI=false, partition table=mbr
@@ -798,7 +824,9 @@ if [ "$ANSWER" == "y" ]; then
                 parted "$DISK" --script "mktable msdos" \
                                         "mkpart primary 1mib 501mib" \
                                         "mkpart primary 502mib -1"
-                
+             
+                IS_SEPERATE="true"
+    
                 BOOT_PARTITION="$DISK"1
                 ENCRYPT_PARTITION="$DISK"2
             fi
@@ -831,8 +859,9 @@ if [ "$ANSWER" == "y" ]; then
                 parted "$DISK" --script "set 1 boot on" \
                                         "set 1 esp on"
                 
-                ESP="$DISK"1
                 IS_ESP_FORMAT="true"
+
+                ESP="$DISK"1
                 BOOT_PARTITION="$DISK"2
                 SWAP_PARTITION="$DISK"3
                 SYSTEM_PARTITION="$DISK"4
@@ -849,8 +878,9 @@ if [ "$ANSWER" == "y" ]; then
                 parted "$DISK" --script "set 1 boot on" \
                                         "set 1 esp on"
                     
-                ESP="$DISK"1
                 IS_ESP_FORMAT="true"
+                
+                ESP="$DISK"1
                 BOOT_PARTITION="$DISK"2
                 SWAP_PARTITION="$DISK"3
                 SYSTEM_PARTITION="$DISK"4
@@ -932,18 +962,59 @@ else #Manuel partition selection
     fi
     
     #Inform the user about needed partitions
-    prompt_different "Needed partitions are:"
+    clear
+    prompt_info "Needed partitions:"
+    printf "\033[1A\033[2K\r"
     if output=$([ "$PARTITION_TABLE" == "gpt" ] && [ "$IS_UEFI" == "false" ]); then
-        prompt_different "#BIOS Grub Partition"
+    
+        prompt_different "BIOS Grub Partition"
     elif [ "$IS_UEFI" == "true" ]; then
-        prompt_different "#EFI System Partition"
+    
+        prompt_different "EFI System Partition"
     fi
-    prompt_different "#Boot Partition"
-    prompt_different "#Swap Partition"
-    prompt_different "#System Partition"
-    prompt_different "#Home Partition (optional)"
+    echo
+    prompt_different "Boot Partition"
+    echo
+    prompt_different "Swap Partition"
+    echo
+    prompt_different "System Partition"
+    echo
+    prompt_different "Home Partition (optional)"
+    echo
+
+    #Look for LUKS partitions
+    declare LUKS=""
+    LUKS=$(lsblk "$DISK" -o path,fstype | grep "crypto_LUKS" | awk '{print $1}')
+
+    if [ -n "$LUKS" ]; then
+
+        declare -i current_=0
     
+        prompt_info "LUKS partitions found!"
+        printf "\033[1A"
+        prompt_different "$LUKS"
+        echo
+        echo
     
+        for i in $LUKS; do
+    
+            prompt_question "Do you want to open $i (y/n): "
+            yes_no
+    
+            if [ "$ANSWER" == "y" ]; then
+    
+                current_+=1
+    
+                prompt_info "Opening $i..."
+                cryptsetup open $i LUKS$current_
+            fi
+        done
+    else
+    
+        sleep 7s
+    fi
+
+
     #BIOS GRUB partition
     if output=$([ "$PARTITION_TABLE" == "gpt" ] && [ "$IS_UEFI" == "false" ]); then
     
@@ -956,13 +1027,18 @@ else #Manuel partition selection
         clear
         echo "$PRINT"
         
-        prompt_question "Please specify the number for the Grub parition (1mib partition advised): "
+        printf "${LIGHT_CYAN}Please specify the number for the Grub parition ${LIGHT_RED}(1mib partition advised)${LIGHT_CYAN}: ${NOCOLOUR}"
         number_check "$last_partition"
         
         parted "$DISK" --script "set $NUMBER_CHECK bios_grub on"
         sleep 2s
     fi
+
     
+    #Print the disk
+    clear
+    lsblk "$DISK" -o +path,partlabel
+
     #Get ESP
     if [ "$IS_UEFI" == "true" ]; then
         
@@ -972,12 +1048,8 @@ else #Manuel partition selection
         IS_ESP_FORMAT="false"
     
         while true; do
-        
-            #Print the disk
-            clear
-            lsblk "$DISK" -o +path,partlabel
-        
-            prompt_question "Please enter the path for EFI System partiton: "
+            
+            prompt_path "EFI System partiton: "
             partition_check
             mount "$PART_CHECK" /mnt/is_esp
             
@@ -999,76 +1071,44 @@ else #Manuel partition selection
     fi
     
     #Get Boot
-    prompt_question "Please enter the path for a Boot partition: "
+    prompt_path "a Boot partition: "
     partition_check
     BOOT_PARTITION="$PART_CHECK"
     
     #Get Swap
-    prompt_question "Please enter the path for a Swap partition: "
+    prompt_path "a Swap partition: "
     partition_check
     SWAP_PARTITION="$PART_CHECK"
 
     #Is seperate?
-    prompt_different "Does home and system partitions seperate? (y/n)"
+    prompt_different "Does home and system partitions seperate? (y/n): "
     yes_no
     if [ "$ANSWER" == "y" ]; then
     
         IS_SEPERATE="true"
     
-        #Get System or LUKS
-        prompt_question "Please enter the path for a System or LUKS partition:"
+        #Get System
+        prompt_path "a System partition: "
         partition_check
-        
-        #Check if it's a LUKS partition
-        if output=$(lsblk -o +path,fstype | awk '{print $7,$8}' | grep -x "$PART_CHECK crypto_LUKS"); then
-    
-            prompt_info "Opening system partition..."
-            cryptsetup open "$PART_CHECK" cryptlvm
-            sleep 2s
-            clear
-            lsblk "$DISK" -o +path,partlabel
-    
-            prompt_question "Please enter the path for a System partition:"
-            partition_check
-            SYSTEM_PARTITION="$PART_CHECK"
-        else
-        
-            SYSTEM_PARTITION="$PART_CHECK"
-        fi
+        SYSTEM_PARTITION="$PART_CHECK"
     
         #Home
-        prompt_question "Please enter the path for a Home partition:"
+        prompt_path "a Home partition: "
         partition_check
         HOME_PARTITION="$PART_CHECK"
     else
 
         IS_SEPERATE="false"
     
-        #Get Systen or LUKS
-        prompt_question "Please enter the path for a System or LUKS partition:"
+        #Get Systen
+        prompt_path "a System partition: "
         partition_check
-        
-        #Check if it's a LUKS partition
-        if output=$(lsblk -o +path,fstype | awk '{print $7,$8}' | grep -x "$PART_CHECK crypto_LUKS"); then
-    
-            prompt_info "Opening system partition..."
-            cryptsetup open "$PART_CHECK" cryptlvm
-            sleep 2s
-            clear
-            lsblk "$DISK" -o +path,partlabel
-    
-            prompt_question "Please enter the path for a Root partition:"
-            partition_check
-            SYSTEM_PARTITION="$PART_CHECK"
-        else
-        
-            SYSTEM_PARTITION="$PART_CHECK"
-        fi
+        SYSTEM_PARTITION="$PART_CHECK"
     fi
 fi
 
 #Wait before using parted again in case the disk is old
-sleep 2s
+sleep 5s
 
 #Print current configuration
 clear
@@ -1188,8 +1228,9 @@ print_packages
 
 # -------------------------- Video Driver Selection -------------------------- #
 #Get model
-prompt_info "Your graphics card model is: "
+prompt_info "Your graphics card model is:"
 lspci -v | grep -A1 -e VGA -e 3D
+echo
 
 choose_one "Driver Packages are: " "$VIDEO_DRIVER" "$VIDEO_DRIVER_AUR"
 SELECTED_VIDEO_DRIVER="$SELECTION"
