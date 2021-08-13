@@ -170,7 +170,7 @@ function unmount () {
     #Check if SWAP_U is non-zero
     if [ -n "$SWAP_U" ]; then
         
-        for i in $(echo $SWAP_U | awk '{print $2}'); do
+        for i in $(echo "$SWAP_U" | awk '{print $2}'); do
         
             swapoff "$i"
         done
@@ -217,7 +217,7 @@ function Exit_ () {
 
     unmount
 
-    exit $1
+    exit "$1"
 }
 
 
@@ -251,7 +251,7 @@ function disk_check () {
     declare INPUT=""
     read -e -r INPUT
 
-    while ! output=$(lsblk -o +path,partlabel | awk '{print $6,$7}' | grep -x "disk $INPUT"); do
+    while ! output=$(lsblk -o type,path | grep -x "disk $INPUT"); do
     
         prompt_warning "The disk '$INPUT' couldn't found."
         printf "Please try again: "
@@ -267,7 +267,7 @@ function partition_check () {
     declare INPUT=""
     read -e -r INPUT
 
-    while ! output=$(lsblk "$DISK" -o +path,partlabel | awk '{print $7}' | grep -x "$INPUT"); do
+    while ! output=$(lsblk -o type,path "$DISK" | grep -x "part $INPUT"); do
     
         prompt_warning "Partition '$INPUT' couldn't found."
         printf "Please try again: "
@@ -284,7 +284,7 @@ function number_check () {
     max_=$1
     
     read -e -r NUMBER_CHECK
-    while output=$( [[ ! $NUMBER_CHECK =~ ^[0-9]+$ ]] || (( NUMBER_CHECK > max_ )) ); do
+    while output=$( [[ ! $NUMBER_CHECK =~ ^[0-9]+$ ]] || (( NUMBER_CHECK > max_ )) || (( NUMBER_CHECK == 0 )) ); do
     
         prompt_warning "Wrong number!"
         printf "${LIGHT_CYAN}Please re-enter: ${NOCOLOUR}"
@@ -1295,15 +1295,12 @@ prompt_info "Generating fstab..."
 # ---------------------------------------------------------------------------- #
 function setup () {
 
-    #Timezone
+    #Set timezone
     declare LIST=""
-    declare LIST_RAW=""
     declare TIMEZONE=""
-    declare max=""
+    declare -i max=0
     
-    LIST_RAW="$(timedatectl list-timezones)"
-    LIST="$(echo "$LIST_RAW" | cat -n)"
-    max="$(echo "$LIST" | tail -1 | awk '{print $1}')"
+    LIST="$(timedatectl list-timezones)"
     
     prompt_different "Please find your timezone in the list."
     echo
@@ -1311,23 +1308,31 @@ function setup () {
     prompt_warning "Press any key to continue..."
     read -e -r TMP
     
-    echo "$LIST" | less
+    #List timezones
+    {
+        for i in $LIST; do
+    
+            max+=1
+            printf "${LIGHT_CYAN}%s ${NOCOLOUR}" "$max"
+            printf "${YELLOW}%s${NOCOLOUR}\n" "$i"
+        done
+    } | less --raw-control-chars
+
     prompt_question "Please specify your timezone: "
     number_check "max"
     
-    TIMEZONE=$(echo "$LIST_RAW" | head -"$NUMBER_CHECK" | tail -1)
+    TIMEZONE=$(echo "$LIST" | head -"$NUMBER_CHECK" | tail -1)
     prompt_info "Setting timezone..."
     ln -sf /usr/share/zoneinfo/"$TIMEZONE" /etc/localtime
     
     #Locales
-    prompt_different "Please uncomment the needed locales (en_US.UTF-8 UTF-8, YOUR_LOCALE) in the file that is going to open."
-    echo
-    prompt_different "Press Ctrl-S to save and Ctrl-X to exit."
-    echo
+    printf "${LIGHT_GREEN}Please uncomment the needed locales ${LIGHT_RED}(en_US.UTF-8 UTF-8 and YOUR_LOCALE)${LIGHT_GREEN} in the file that is going to open.${NOCOLOUR}\n"
+    printf "${LIGHT_GREEN}You can press ${LIGHT_RED}Ctrl-S${LIGHT_GREEN} to save and ${LIGHT_RED}Ctrl-X${LIGHT_GREEN} to exit.${NOCOLOUR}\n"
     prompt_warning "Press any key to continue..."
     read -e -r TMP
-    prompt_info "Generating locales..."
     nano /etc/locale.gen
+    
+    prompt_info "Generating locales..."
     loale-gen
     
     #Locale.conf
@@ -1339,10 +1344,8 @@ function setup () {
     yes_no
     if [ "$ANSWER" == "y" ]; then
     
-        prompt_different "Please write your keyboard layout in the file that is going to open. (ex: KEYMAP=de-latin1)"
-        echo
-        prompt_different "Press Ctrl-S to save and Ctrl-X to exit."
-        echo
+        printf "${LIGHT_GREEN}Please write your keyboard layout in the file that is going to open. ${LIGHT_RED}(ex: KEYMAP=de-latin1)${NOCOLOUR}\n"
+        printf "${LIGHT_GREEN}You can press ${LIGHT_RED}Ctrl-S${LIGHT_GREEN} to save and ${LIGHT_RED}Ctrl-X${LIGHT_GREEN} to exit.${NOCOLOUR}\n"
         prompt_warning "Press any key to continue..."
         read -e -r TMP
         printf "KEYMAP=" > /etc/vconsole.conf
@@ -1419,10 +1422,8 @@ function setup () {
             
             echo "GRUB_CMDLINE_LINUX=\"cryptdevice=$ENCRYPT_UUID:cryptlvm root=/dev/$VOLGROUP/root\"" >> /etc/default/grub
             
-            prompt_different "Needed format appended to the file."
-            echo
-            prompt_different "Just comment the first 'GRUB_CMDLINE_LINUX=...' line, and uncomment the second one."
-            echo
+            prompt_different "Needed format appended to the file.\n"
+            printf "${LIGHT_GREEN}Just comment the first ${LIGHT_RED}'GRUB_CMDLINE_LINUX=...'${LIGHT_GREEN} line, and uncomment the second one.${NOCOLOUR}\n"
             prompt_warning "Press any key to continue..."
             read -e -r TMP
             
@@ -1448,8 +1449,7 @@ function setup () {
         prompt_warning "Cannot modify /etc/sudoers!"
         prompt_warning "You have to modify it manually."
         
-        prompt_different "Just uncomment the '# %sudo...' line."
-        echo
+        printf "${LIGHT_GREEN}Just uncomment the ${LIGHT_RED}'# %sudo...'${LIGHT_GREEN} line.${NOCOLOUR}"
         prompt_warning "Press any key to continue..."
         read -e -r TMP
         
@@ -1467,14 +1467,14 @@ function setup () {
     done
     while ! passwd "$USER_NAME"; do
 
-    prompt_warning "Try again."
+        prompt_warning "Try again."
     done
     
     #Setting root password
     printf "Root "
     while ! passwd root; do
 
-    prompt_warning "Try again."
+        prompt_warning "Try again."
     done
     
     #Pass username to second phase
