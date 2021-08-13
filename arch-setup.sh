@@ -3,7 +3,7 @@
 # -------------------------------- COPYRIGHT ------------------------------- #
 #    <Arch Linux installer>
 #    
-#    Copyright (C) <2021> <Fatih Yeğin>
+#    Copyright (C) <2021> <Fatih Yegin>
 #    
 #    This program is free software: you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
@@ -41,6 +41,8 @@ declare NUMBER_CHECK=""
 declare PKG_SELECT=""
 declare ANSWER=""
 declare SELECTION=""
+
+declare INSTALL_PATH=""
 
 declare PARTITION_TABLE=""
 declare DEVICE=""
@@ -152,64 +154,72 @@ function prompt_path () {
 
 function unmount () {
 
-    #Umount the selected disk
-    
     prompt_info "Unmounting please wait..."
-    
-    for i in $(lsblk -o mountpoints "$DISK" | grep / | sort --reverse); do
-    
-        umount "$i"
-    done
 
-    sleep 2s
-
-    #Swapoff if the selected disk has a swap partition
-    declare SWAP_U=""
-    SWAP_U=$(lsblk -o fstype,path "$DISK" | grep -i swap)
+    #Umount
+    declare MOUNTPOINTS_U=""
+    MOUNTPOINTS_U=$(lsblk -o mountpoints "$DISK" | grep "/" | sort --reverse)
     
-    #Check if SWAP_U is non-zero
-    if [ -n "$SWAP_U" ]; then
-        
-        for i in $(echo "$SWAP_U" | awk '{print $2}'); do
-        
-            swapoff "$i"
+    if [ -n "$MOUNTPOINTS_U" ]; then
+
+        for i in $MOUNTPOINTS_U; do
+
+               umount "$i"
         done
+
+        sleep 3s
     fi
 
-    sleep 2s
+    #Swapoff
+    declare SWAPS_U=""
+    SWAPS_U=$(lsblk -o mountpoints,path "$DISK" | grep "\[SWAP\]" | awk '{print $2}')
 
-    #Find if it has logical volumes
+    if [ -n "$SWAPS_U" ]; then
+
+        for i in $SWAPS_U; do
+                
+            swapoff "$i"
+        done
+
+        sleep 3s
+    fi
+
+    #Shared variable
+    declare CRYPT_U=""
+    CRYPT_U=$(lsblk -o type,path "$DISK")
+
+    #Logical volumes
     declare LVM_U=""
-    LVM_U=$(lsblk -o type,path "$DISK" | grep lvm)
+    LVM_U=$(echo "$CRYPT_U" | grep -w "lvm" | awk '{print $2}')
     
-    #Check if LVM_U is non-zero
     if [ -n "$LVM_U" ]; then
     
-        for i in $(echo "$LVM_U" | awk '{print $2}'); do
+        for i in $LVM_U; do
         
             cryptsetup close "$i"
         done
+
+        sleep 3s
     fi
 
-    sleep 2s
-
-    #Find if it has LUKS partitions
+    #LUKS partitions
     declare LUKS_U=""
-    LUKS_U=$(lsblk -o type,path "$DISK" | grep crypt)
+    LUKS_U=$(echo "$CRYPT_U" | grep -w "crypt" | awk '{print $2}')
     
     #Check if LUKS_U is non-zero
     if [ -n "$LUKS_U" ]; then
     
-        for i in $(echo "$LUKS_U" | awk '{print $2}'); do
+        for i in $LUKS_U; do
         
             cryptsetup close "$i"
         done
+
+        sleep 3s
     fi
 
-    sleep 2s
-
-    #And finally inform the kernel
-    partprobe &>> /dev/null
+    #Inform the kernel
+    prompt_info "Informing kernel..."
+    partprobe
 }
 
 
@@ -251,7 +261,8 @@ function disk_check () {
     declare INPUT=""
     read -e -r INPUT
 
-    while ! output=$(lsblk -o type,path | grep -x "disk $INPUT"); do
+    #Use awk to remove unnecessary spaces
+    while ! output=$(lsblk -o type,path | awk '{print $1,$2}'| grep -x "disk $INPUT"); do
     
         prompt_warning "The disk '$INPUT' couldn't found."
         printf "Please try again: "
@@ -267,7 +278,8 @@ function partition_check () {
     declare INPUT=""
     read -e -r INPUT
 
-    while ! output=$(lsblk -o type,path "$DISK" | grep -x "part $INPUT"); do
+    #Use awk to remove unnecessary spaces
+    while ! output=$(lsblk -o type,path "$DISK" | awk '{print $1,$2}' | grep -v "disk" | grep "$INPUT"); do
     
         prompt_warning "Partition '$INPUT' couldn't found."
         printf "Please try again: "
@@ -412,14 +424,14 @@ function choose_one () {
             if (( current < aur_part )); then
             
                 PACKAGES=" $i"
+                SELECTION="$i"
                 break
             elif (( current >= aur_part )); then
             
                 AUR_PACKAGES+=" $i"
+                SELECTION="$i"
                 break
             fi
-            
-            SELECTION="$i"
         fi
     done
 }
@@ -434,8 +446,8 @@ function setup_second_phase () {
 
 #Get user name that taken after first phase and delete that file
 declare USER_NAME=""
-USER_NAME="$(cat /mnt/$DEVICE/user_name.txt)"
-rm "/mnt/$DEVICE/user_name.txt"
+USER_NAME="$(cat $INSTALL_PATH/user_name.txt)"
+rm "$INSTALL_PATH/user_name.txt"
 
 #Inform the user (still in first phase)
 prompt_info "Generating setup_second_phase.sh..."
@@ -445,6 +457,10 @@ prompt_info "Generating setup_second_phase.sh..."
 
 echo "#!/bin/bash
 
+
+# ---------------------------------------------------------------------------- #
+#                      ! This is an Auto Generated file !                      #
+# ---------------------------------------------------------------------------- #
 
 #Colours for colourful output
 declare LIGHT_RED='\033[1;31m'
@@ -465,7 +481,7 @@ function check_connection () {
 function unmount () {
 
     #Unmount the mounted partitions recursively
-    umount -R \"/mnt/$DEVICE\"
+    umount -R \"$INSTALL_PATH\"
 
     swapoff \"$SWAP_PARTITION\"
 
@@ -475,7 +491,13 @@ function unmount () {
         cryptsetup close \"$HOME_PARTITION\"
         cryptsetup close \"$SYSTEM_PARTITION\"
 
-        cryptsetup close \"/dev/mapper/cryptlvm\"
+        if [ -n \"$ENCRYPT_PARTITION\" ]; then
+
+            for i in $ENCRYPT_PARTITION; do
+
+                cryptsetup close \"\$i\"
+            done
+        fi
     fi
     
     partprobe
@@ -624,7 +646,7 @@ export -f failure
 export -f aur
 
 #Run aur function
-arch-chroot \"/mnt/$DEVICE\" /bin/bash -c \"aur\"
+arch-chroot \"$INSTALL_PATH\" /bin/bash -c \"aur\"
 
 prompt_warning \"ARCH SETUP FINISHED!!\"
 prompt_warning \"You can safely reboot now.\"
@@ -681,6 +703,9 @@ while true; do
     if [ "$DEVICE" == "$CHECK" ]; then
 
         VOLGROUP="$DEVICE"VolGroup
+        INSTALL_PATH="/INSTALL/$DEVICE"
+
+        mkdir -p "$INSTALL_PATH"
         break
     else
 
@@ -975,7 +1000,7 @@ if [ "$ANSWER" == "y" ]; then
             fi
         fi
     fi
-else #Manuel partition selection
+else #Manual partition selection
     
     #Partition table is not suitable for linux
     if [ "$PARTITION_TABLE" == "other" ]; then
@@ -1029,7 +1054,10 @@ else #Manuel partition selection
                 current_+=1
     
                 prompt_info "Opening $i..."
-                cryptsetup open "$i" LUKS$current_
+                cryptsetup open "$i" LUKS$current_ || failure "Error! try rebooting."
+
+		IS_ENCRYPT="true"
+                ENCRYPT_PARTITION+=" $i"
             fi
         done
     else
@@ -1208,26 +1236,26 @@ fi
 prompt_info "Mounting..."
 
 #System
-mkdir -p "/mnt/$DEVICE"
-mount "$SYSTEM_PARTITION" "/mnt/$DEVICE"
+mkdir -p "$INSTALL_PATH"
+mount "$SYSTEM_PARTITION" "$INSTALL_PATH"
 
 #ESP
 #https://wiki.archlinux.org/title/EFI_system_partition#Mount_the_partition
 if [ "$IS_UEFI" == "true" ]; then
 
-    mkdir -p "/mnt/$DEVICE/efi"
-    mount "$ESP" "/mnt/$DEVICE/efi"
+    mkdir -p "$INSTALL_PATH/efi"
+    mount "$ESP" "$INSTALL_PATH/efi"
 fi
 
 #Boot
-mkdir -p "/mnt/$DEVICE/boot"
-mount "$BOOT_PARTITION" "/mnt/$DEVICE/boot"
+mkdir -p "$INSTALL_PATH/boot"
+mount "$BOOT_PARTITION" "$INSTALL_PATH/boot"
 
 #Home
 if [ "$IS_SEPERATE" == "true" ]; then
     
-    mkdir -p "/mnt/$DEVICE/home"
-    mount "$HOME_PARTITION" "/mnt/$DEVICE/home"
+    mkdir -p "$INSTALL_PATH/home"
+    mount "$HOME_PARTITION" "$INSTALL_PATH/home"
 fi
 
 
@@ -1278,16 +1306,15 @@ check_connection
 echo
 for i in {5..0}; do
 
-    prompt_warning "Installation will start in: "
-    printf "${LIGHT_CYAN}$i${NOCOLOUR}\033[0K\r"
+    printf "${LIGHT_RED}Installation will start in: ${LIGHT_CYAN}%s${NOCOLOUR}\033[0K\r" "$i"
     sleep 1s
 done
 
-#pacstrap "/mnt/$DEVICE" $CORE_PACKAGES $PACKAGES $BOOTLOADER_PACKAGES $DISPLAY_MANAGER $DE_PACKAGES $DE_DEPENDENT_PACKAGES
+pacstrap "$INSTALL_PATH" $CORE_PACKAGES $PACKAGES $BOOTLOADER_PACKAGES $DISPLAY_MANAGER $DE_PACKAGES $DE_DEPENDENT_PACKAGES
 
 #Generate fstab
 prompt_info "Generating fstab..."
-#genfstab -U "/mnt/$DEVICE" >> "/mnt/$DEVICE/etc/fstab"
+genfstab -U "$INSTALL_PATH" >> "$INSTALL_PATH/etc/fstab"
 
 
 # ---------------------------------------------------------------------------- #
@@ -1304,7 +1331,8 @@ function setup () {
     
     prompt_different "Please find your timezone in the list."
     echo
-    printf "${YELLOW}About to list timezones... (you can quit the listing mode with${LIGHT_RED} q ${YELLOW}& use${LIGHT_RED} pg up-down${YELLOW})${NOCOLOUR}"
+    printf "${YELLOW}About to list timezones... ${LIGHT_RED}(Press q to quit and use pg-up, pg-down to move faster.)${NOCOLOUR}"
+    echo
     prompt_warning "Press any key to continue..."
     read -e -r TMP
     
@@ -1314,12 +1342,12 @@ function setup () {
     
             max+=1
             printf "${LIGHT_CYAN}%s ${NOCOLOUR}" "$max"
-            printf "${YELLOW}%s${NOCOLOUR}\n" "$i"
+            printf "${PURPLE}%s${NOCOLOUR}\n" "$i"
         done
     } | less --raw-control-chars
 
-    prompt_question "Please specify your timezone: "
-    number_check "max"
+    prompt_question "Please specify the number of your timezone: "
+    number_check "$max"
     
     TIMEZONE=$(echo "$LIST" | head -"$NUMBER_CHECK" | tail -1)
     prompt_info "Setting timezone..."
@@ -1487,6 +1515,7 @@ function setup () {
 export NUMBER_CHECK="$NUMBER_CHECK"
 export ANSWER="$ANSWER"
 export DEVICE="$DEVICE"
+export INSTALL_PATH="$INSTALL_PATH"
 export IS_ENCRYPT="$IS_ENCRYPT"
 export DISK="$DISK"
 export ENCRYPT_PARTITION="$ENCRYPT_PARTITION"
@@ -1508,7 +1537,7 @@ export -f prompt_different
 
 export -f setup
 
-arch-chroot "/mnt/$DEVICE" /bin/bash -c "setup"
+arch-chroot "$INSTALL_PATH" /bin/bash -c "setup"
 
 #Setup second phase
 setup_second_phase
