@@ -248,6 +248,8 @@ function Exit_ () {
 
     unmount
 
+    rm -f "/tmp/$PROGRAM_NAME.lock"
+
     exit "$1"
 }
 
@@ -520,8 +522,7 @@ trap clean_up SIGHUP SIGINT SIGTERM
 
 function clean_up () {
 
-    rm -f \"/tmp/\$PROGRAM_NAME.lock\"
-
+    prompt_warning \"Signal received!\"
     prompt_warning \"Exiting...\"
     Exit_ \"155\"
 }
@@ -560,6 +561,8 @@ echo 'function Exit_ () {
 
     #unmount
 
+    rm -f "/tmp/$PROGRAM_NAME.lock"
+
     exit $1
 }
 
@@ -588,7 +591,7 @@ echo "#The aur function (will be called in chroot)
 function aur () {
 
     #Make a github directory and clone yay (will be called in user's terminal)
-    function install_yay () {
+    function clone_yay () {
 
         #Generating home directories
         prompt_info \"Generating home directories...\"
@@ -602,11 +605,6 @@ function aur () {
         cd Git-Hub || failure \"Cannot change directory to /home/\$USER_NAME/Git-Hub\"
 
         git clone https://aur.archlinux.org/yay.git || failure \"Cannot clone yay.\"
-
-        #Install yay.
-        prompt_info \"Installing yay...\"
-        cd yay || failure \"Cannot change directory to /home/\$USER_NAME/Git-Hub/yay\"
-        makepkg -si --noconfirm || failure \"Error Cannot install yay!\"
     }
 
     #Generating home directories
@@ -621,10 +619,19 @@ function aur () {
     export USER_NAME=\"\$USER_NAME\"
     
     #Export functions to call it in the user's shell
-    export -f install_yay
+    export -f clone_yay
     export -f check_connection
 
-    su \"\$USER_NAME\" /bin/bash -c install_yay
+    #Clone yay
+    su \"\$USER_NAME\" /bin/bash -c clone_yay || Exit_ \$?
+
+    #Arrange permissions
+    chown -R \"\$USER_NAME:\$USER_NAME\" \"/home/\$USER_NAME/.cache/\"
+
+    #Install yay.
+    prompt_info \"Installing yay...\"
+    cd \"/home/\$USER_NAME/Git-Hub/yay\" || failure \"Cannot change directory to /home/\$USER_NAME/Git-Hub/yay\"
+    sudo -u \"\$USER_NAME\" makepkg -si --noconfirm || failure \"Error Cannot install yay!\"
     
     #Download pkgbuilds
     prompt_info \"Downloading pkgbuilds...\"
@@ -732,7 +739,7 @@ export -f Exit_
 export -f aur
 
 #Run aur function
-arch-chroot \"\$MOUNT_PATH\" /bin/bash -c \"aur\"
+arch-chroot \"\$MOUNT_PATH\" /bin/bash -c \"aur\" || Exit_ \$?
 
 prompt_warning \"ARCH SETUP FINISHED!!\"
 prompt_warning \"You can safely reboot now.\"
