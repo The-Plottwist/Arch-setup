@@ -294,7 +294,14 @@ function partition_check () {
 function number_check () {
 
     declare max_=0
-    max_=$1
+    
+    if output=$([[ ! $1 =~ ^[0-9]+$ ]] || (( $1 == 0 )) ); then
+    
+        failure "Function number_check: INTERNAL ERROR! Wrong input received, revise the code."
+    else
+    
+        max_=$1
+    fi
     
     read -e -r NUMBER_CHECK
     while output=$( [[ ! $NUMBER_CHECK =~ ^[0-9]+$ ]] || (( NUMBER_CHECK > max_ )) || (( NUMBER_CHECK == 0 )) ); do
