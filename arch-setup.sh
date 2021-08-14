@@ -19,6 +19,7 @@
 #    E-mail: mail.fyegin@gmail.com
 # -------------------------------------------------------------------------- #
 
+
 #Important note:
 #This script is consists of two phases.
 #First phase includes: Partitioning - Installing system - Installing bootloader & official packages - Adding user account & Setting a root password
@@ -34,6 +35,12 @@
 
 
 # ---------------------------------- Globals --------------------------------- #
+
+declare PROGRAM_NAME=""
+PROGRAM_NAME="$0"
+
+declare USER_NAME_TMP_FILE=""
+USER_NAME_TMP_FILE="/tmp/$PROGRAM_NAME.$$.$RANDOM"
 
 declare DISK_CHECK=""
 declare PART_CHECK=""
@@ -118,6 +125,19 @@ declare NOCOLOUR='\033[0m'
 
 
 # --------------------------------- Functions -------------------------------- #
+#Signal handling
+trap clean_up SIGHUP SIGINT SIGTERM
+
+function clean_up () {
+
+    rm -f "$USER_NAME_TMP_FILE"
+    rm -f "/tmp/$PROGRAM_NAME.lock"
+    echo
+    prompt_warning "Signal received..."
+    prompt_warning "Exiting..."
+    Exit_ "130"
+}
+
 function check_connection () {
 
     { ping wiki.archlinux.org -c 1 &>> /dev/null; } || failure "No internet connection!"
@@ -297,7 +317,7 @@ function number_check () {
     
     if output=$([[ ! $1 =~ ^[0-9]+$ ]] || (( $1 == 0 )) ); then
     
-        failure "Function number_check: INTERNAL ERROR! Wrong input received, revise the code."
+        failure "Function number_check: INTERNAL ERROR! Wrong input received: \"$1\". -Revise the code-"
     else
     
         max_=$1
@@ -454,8 +474,8 @@ function setup_second_phase () {
 
 #Get user name that taken after first phase and delete that file
 declare USER_NAME=""
-USER_NAME="$(cat $MOUNT_PATH/user_name.txt)"
-rm "$MOUNT_PATH/user_name.txt"
+USER_NAME=$(cat "$USER_NAME_TMP_FILE")
+rm "$USER_NAME_TMP_FILE"
 
 #Inform the user (still in first phase)
 prompt_info "Generating setup_second_phase.sh..."
@@ -470,18 +490,41 @@ echo "#!/bin/bash
 #                      ! This is an Auto Generated file !                      #
 # ---------------------------------------------------------------------------- #
 
+declare PROGRAM_NAME=\"\"
+PROGRAM_NAME=\"\$0\"
+
 #Colours for colourful output
 declare LIGHT_RED='\033[1;31m'
 declare YELLOW='\033[1;33m'
 declare NOCOLOUR='\033[0m' #No Colour
 
+declare MOUNT_PATH=\"$MOUNT_PATH\"
+
+declare IS_ENCRYPT=\"$IS_ENCRYPT\"
 declare ENCRYPT_PARTITION=\"$ENCRYPT_PARTITION\"
+declare SWAP_PARTITION=\"$SWAP_PARTITION\"
+declare HOME_PARTITION=\"$HOME_PARTITION\"
+declare SYSTEM_PARTITION=\"$SYSTEM_PARTITION\"
+
+declare USER_NAME=\"$USER_NAME\"
+declare AUR_PACKAGES=\"$AUR_PACKAGES\"
+declare SELECTED_GREETER=\"$SELECTED_GREETER\"
 
 
 # ---------------------------------------------------------------------------- #
 #                                   Functions                                  #
 # ---------------------------------------------------------------------------- #
 
+#Signal handling
+trap clean_up SIGHUP SIGINT SIGTERM
+
+function clean_up () {
+
+    rm -f \"/tmp/\$PROGRAM_NAME.lock\"
+
+    prompt_warning \"Exiting...\"
+    Exit_ \"155\"
+}
 
 function check_connection () {
 
@@ -491,17 +534,17 @@ function check_connection () {
 function unmount () {
 
     #Unmount the mounted partitions recursively
-    umount -R \"$MOUNT_PATH\"
+    umount -R \"\$MOUNT_PATH\"
 
-    swapoff \"$SWAP_PARTITION\"
+    swapoff \"\$SWAP_PARTITION\"
 
     sleep 2s
 
-    if [ \"$IS_ENCRYPT\" == \"true\" ]; then
+    if [ \"\$IS_ENCRYPT\" == \"true\" ]; then
     
-        cryptsetup close \"$SWAP_PARTITION\"
-        cryptsetup close \"$HOME_PARTITION\"
-        cryptsetup close \"$SYSTEM_PARTITION\"
+        cryptsetup close \"\$SWAP_PARTITION\"
+        cryptsetup close \"\$HOME_PARTITION\"
+        cryptsetup close \"\$SYSTEM_PARTITION\"
 
         for i in \$ENCRYPT_PARTITION; do
 
@@ -554,15 +597,15 @@ function aur () {
         check_connection
 
         prompt_info \"Cloning yay...\"
-        cd \"/home/$USER_NAME\" || failure \"Cannot change directory to /home/$USER_NAME\"
-        mkdir -p Git-Hub || failure \"/home/$USER_NAME/Git-Hub directory couldn't made.\"
-        cd Git-Hub || failure \"Cannot change directory to /home/$USER_NAME/Git-Hub\"
+        cd \"/home/\$USER_NAME\" || failure \"Cannot change directory to /home/\$USER_NAME\"
+        mkdir -p Git-Hub || failure \"/home/\$USER_NAME/Git-Hub directory couldn't made.\"
+        cd Git-Hub || failure \"Cannot change directory to /home/\$USER_NAME/Git-Hub\"
 
         git clone https://aur.archlinux.org/yay.git || failure \"Cannot clone yay.\"
 
         #Install yay.
         prompt_info \"Installing yay...\"
-        cd yay || failure \"Cannot change directory to /home/$USER_NAME/Git-Hub/yay\"
+        cd yay || failure \"Cannot change directory to /home/\$USER_NAME/Git-Hub/yay\"
         makepkg -si --noconfirm || failure \"Error Cannot install yay!\"
     }
 
@@ -574,27 +617,30 @@ function aur () {
     prompt_info \"Installing go for aur helper... -yay-\"
     pacman -S --noconfirm go
     
+    #Export variables to use it in the user's shell
+    export USER_NAME=\"\$USER_NAME\"
+    
     #Export functions to call it in the user's shell
     export -f install_yay
     export -f check_connection
 
-    su \"$USER_NAME\" /bin/bash -c install_yay
+    su \"\$USER_NAME\" /bin/bash -c install_yay
     
     #Download pkgbuilds
     prompt_info \"Downloading pkgbuilds...\"
-    mkdir -p \"/home/$USER_NAME/.cache/yay\" || { prompt_warning \"Cannot make /home/$USER_NAME/.cache/yay directory!\"; prompt_warning \"Instead, downloading to /home/$USER_NAME\"; }
+    mkdir -p \"/home/\$USER_NAME/.cache/yay\" || { prompt_warning \"Cannot make /home/\$USER_NAME/.cache/yay directory!\"; prompt_warning \"Instead, downloading to /home/\$USER_NAME\"; }
     
-    if [ -d \"/home/$USER_NAME/.cache/yay\" ]; then
+    if [ -d \"/home/\$USER_NAME/.cache/yay\" ]; then
         
-        cd \"/home/$USER_NAME/.cache/yay\" || failure \"Cannot change directory to /home/$USER_NAME/.cache/yay\"
+        cd \"/home/\$USER_NAME/.cache/yay\" || failure \"Cannot change directory to /home/\$USER_NAME/.cache/yay\"
     else
         
-        cd \"/home/$USER_NAME/\" || failure \"Cannot change directory to /home/$USER_NAME/\"
+        cd \"/home/\$USER_NAME/\" || failure \"Cannot change directory to /home/\$USER_NAME/\"
     fi
-    yay --getpkgbuild $AUR_PACKAGES || failure \"Cannot download pkgbuilds!\"
+    yay --getpkgbuild \$AUR_PACKAGES || failure \"Cannot download pkgbuilds!\"
 
     #Arrange permissions
-    chown -R \"$USER_NAME:$USER_NAME\" \"/home/$USER_NAME/.cache/\"
+    chown -R \"\$USER_NAME:\$USER_NAME\" \"/home/\$USER_NAME/.cache/\"
 "
 
 echo '    #Install aur packages
@@ -611,9 +657,9 @@ echo '    #Install aur packages
 echo "    #Check if /etc/lightdm.conf exists
     if [ -f \"/etc/lightdm/lightdm.conf\" ]; then
     
-        prompt_info \"Enabling $SELECTED_GREETER...\"
+        prompt_info \"Enabling \$SELECTED_GREETER...\"
         declare LIGHTDM_CONF=\"\"
-        LIGHTDM_CONF=\$(sed \"s/#greeter-session=example-gtk-gnome/greeter-session=$SELECTED_GREETER/g\" /etc/lightdm/lightdm.conf)
+        LIGHTDM_CONF=\$(sed \"s/#greeter-session=example-gtk-gnome/greeter-session=\$SELECTED_GREETER/g\" /etc/lightdm/lightdm.conf)
         sleep 1s
         if [ -n \"\$LIGHTDM_CONF\" ]; then
         
@@ -624,7 +670,7 @@ echo "    #Check if /etc/lightdm.conf exists
         
             prompt_warning \"Cannot modify /etc/lightdm/lightdm.conf file.\"
             prompt_warning \"You have to modify it manually.\"
-            prompt warning \"greeter-session=example-gtk-gnome should be equal to greeter_session=$SELECTED_GREETER (which is under the [Seat:*] section).\"
+            prompt warning \"greeter-session=example-gtk-gnome should be equal to greeter_session=\$SELECTED_GREETER (which is under the [Seat:*] section).\"
             prompt_warning \"Press any key to continue...\"
             read -e -r TMP
         fi
@@ -632,7 +678,7 @@ echo "    #Check if /etc/lightdm.conf exists
 
     #Enabling services
     prompt_info \"Enabling services...\"
-    for i in $SERVICES; do
+    for i in \$SERVICES; do
         
         systemctl enable \$i || { prompt_warning \"Cannot enable \$i service!\"; echo \"\"; echo \"\$i\" >> /\$HOME/disabled_services.txt; prompt_warning \"Service added to /\$HOME/disabled_services.txt, Please enable it manually.\"; }
     done
@@ -642,7 +688,7 @@ echo "    #Check if /etc/lightdm.conf exists
     mkinitcpio -P
     
     #Return home
-    cd \"/home/$USER_NAME\"
+    cd \"/home/\$USER_NAME\"
 
     prompt_warning \"AUR configuration complete!\"
 }
@@ -655,25 +701,44 @@ echo '
 
 '
 
-echo '#Exporting variables to be able to use in chroot
+echo '#Lock file
+if [ -f "/tmp/$PROGRAM_NAME.lock" ]; then
+
+    prompt_warning "Another instance is already running!"
+    prompt_warning "If you think this is a mistake, delete /tmp/$PROGRAM_NAME.lock"
+    prompt_warning "Exiting..."
+    exit 1
+else
+
+    touch "/tmp/$PROGRAM_NAME.lock"
+fi
+
+#Exporting variables to be able to use in chroot
 export LIGHT_RED="$LIGHT_RED"
 export YELLOW="$YELLOW"
 export NOCOLOUR="$NOCOLOUR"
+
+export USER_NAME="$USER_NAME"
+export AUR_PACKAGES="$AUR_PACKAGES"
+export SELECTED_GREETER="$SELECTED_GREETER"
 '
 
 echo "#Export functions to be able to use in chroot
 export -f prompt_info
 export -f prompt_warning
-export -f check_conection
+export -f check_connection
 export -f failure
 export -f Exit_
 export -f aur
 
 #Run aur function
-arch-chroot \"$MOUNT_PATH\" /bin/bash -c \"aur\" || failure \"Error!\"
+arch-chroot \"\$MOUNT_PATH\" /bin/bash -c \"aur\"
 
 prompt_warning \"ARCH SETUP FINISHED!!\"
 prompt_warning \"You can safely reboot now.\"
+
+#Remove lock
+rm -f \"/tmp/\$PROGRAM_NAME.lock\"
 
 unmount
 "
@@ -690,11 +755,23 @@ chmod +x setup_second_phase.sh
 #                                  First Phase                                 #
 # ---------------------------------------------------------------------------- #
 
-#Assuming keyboard layout has already been set
+#Lock file
+if [ -f "/tmp/$PROGRAM_NAME.lock" ]; then
+
+    prompt_warning "Another instance is already running!"
+    prompt_warning "If you think this is a mistake, delete /tmp/$PROGRAM_NAME.lock"
+    prompt_warning "Exiting..."
+    exit 1
+else
+
+    touch "/tmp/$PROGRAM_NAME.lock"
+fi
+
+#Assumes keyboard layout has already been set
 
 #Disclaimer
 clear
-prompt_different "This script is for installing archlinux on an empty (or semi-empty) disk."
+prompt_different "This script is for installing archlinux on an empty (or semi-empty) disk and assumes you already set your keyboard layout."
 echo
 
 prompt_different "You can modify it to your needs, otherwise XFCE will be installed with a custom package set."
@@ -714,7 +791,7 @@ echo
 check_connection
 
 #Set time synchronization active
-timedatectl set-ntp true
+timedatectl set-ntp true &>> /dev/null
 
 #Get device name
 while true; do
@@ -1396,7 +1473,7 @@ function setup () {
     nano /etc/locale.gen
     
     prompt_info "Generating locales..."
-    loale-gen
+    locale-gen
     
     #Locale.conf
     prompt_info "Making /etc/locale.conf file..."
@@ -1405,16 +1482,11 @@ function setup () {
     #Keymap
     if [ ! -f /etc/vconsole.conf ]; then
 
-        prompt_question "Have you set your keyboard layout? (y/n): "
-        yes_no
-        if [ "$ANSWER" == "y" ]; then
-            
-            printf "${LIGHT_GREEN}Please write your keyboard layout in the file that is going to open. ${LIGHT_RED}(ex: KEYMAP=de-latin1)${NOCOLOUR}\n"
-            printf "${LIGHT_GREEN}You can press ${LIGHT_RED}Ctrl-S${LIGHT_GREEN} to save and ${LIGHT_RED}Ctrl-X${LIGHT_GREEN} to exit.${NOCOLOUR}\n"
-            prompt_warning "Press any key to continue..."
-            read -e -r TMP
-            nano /etc/vconsole.conf
-        fi
+        printf "${LIGHT_GREEN}Please write your keyboard layout in the file that is going to open. ${LIGHT_RED}(ex: KEYMAP=de-latin1)${NOCOLOUR}\n"
+        printf "${LIGHT_GREEN}You can press ${LIGHT_RED}Ctrl-S${LIGHT_GREEN} to save and ${LIGHT_RED}Ctrl-X${LIGHT_GREEN} to exit.${NOCOLOUR}\n"
+        prompt_warning "Press any key to continue..."
+        read -e -r TMP
+        nano /etc/vconsole.conf
     fi
 
     #Hostname
@@ -1548,7 +1620,7 @@ function setup () {
     printf "${NOCOLOUR}"
 
     #Pass username to second phase
-    printf "%s" "$USER_NAME" > /user_name.txt
+    printf "%s" "$USER_NAME" > "$USER_NAME_TMP_FILE"
     
     prompt_warning "Installation complete!"
 }
@@ -1562,6 +1634,7 @@ export IS_ENCRYPT="$IS_ENCRYPT"
 export DISK="$DISK"
 export ENCRYPT_PARTITION="$ENCRYPT_PARTITION"
 export VOLGROUP="$VOLGROUP"
+export USER_NAME_TMP_FILE="$USER_NAME_TMP_FILE"
 
 export YELLOW="$YELLOW"
 export PURPLE="$PURPLE"
@@ -1584,6 +1657,9 @@ arch-chroot "$MOUNT_PATH" /bin/bash -c "setup"
 
 #Setup second phase
 setup_second_phase
+
+#Remove lock
+rm -f "/tmp/$PROGRAM_NAME.lock"
 
 #Finish
 prompt_warning "Please run ./setup_second_phase.sh command!"
