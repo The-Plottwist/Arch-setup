@@ -42,7 +42,7 @@ declare PKG_SELECT=""
 declare ANSWER=""
 declare SELECTION=""
 
-declare INSTALL_PATH=""
+declare MOUNT_PATH=""
 
 declare PARTITION_TABLE=""
 declare DEVICE=""
@@ -53,6 +53,7 @@ declare DISK_SIZE_MIB=""
 declare IS_UEFI=""
 declare IS_ENCRYPT=""
 declare IS_SEPERATE=""
+declare IS_AUTO_PARTITIONING=""
 declare ESP=""
 declare IS_ESP_FORMAT=""
 declare BOOT_PARTITION=""
@@ -341,10 +342,10 @@ function print_packages () {
     prompt_info "$AUR_PACKAGES"
     echo
     
-    prompt_warning "Greeter: $SELECTED_GREETER"
+    printf "${LIGHT_RED}Greeter: ${LIGHT_CYAN}%s${NOCOLOUR}" "$SELECTED_GREETER"
     echo
     
-    prompt_warning "Video Driver: $SELECTED_VIDEO_DRIVER"
+    printf "${LIGHT_RED}Video Driver: ${LIGHT_CYAN}%s${NOCOLOUR}" "$SELECTED_VIDEO_DRIVER"
     echo
 }
 
@@ -423,7 +424,7 @@ function choose_one () {
         
             if (( current < aur_part )); then
             
-                PACKAGES=" $i"
+                PACKAGES+=" $i"
                 SELECTION="$i"
                 break
             elif (( current >= aur_part )); then
@@ -446,8 +447,8 @@ function setup_second_phase () {
 
 #Get user name that taken after first phase and delete that file
 declare USER_NAME=""
-USER_NAME="$(cat $INSTALL_PATH/user_name.txt)"
-rm "$INSTALL_PATH/user_name.txt"
+USER_NAME="$(cat $MOUNT_PATH/user_name.txt)"
+rm "$MOUNT_PATH/user_name.txt"
 
 #Inform the user (still in first phase)
 prompt_info "Generating setup_second_phase.sh..."
@@ -467,6 +468,8 @@ declare LIGHT_RED='\033[1;31m'
 declare YELLOW='\033[1;33m'
 declare NOCOLOUR='\033[0m' #No Colour
 
+declare ENCRYPT_PARTITION=\"$ENCRYPT_PARTITION\"
+
 
 # ---------------------------------------------------------------------------- #
 #                                   Functions                                  #
@@ -481,9 +484,11 @@ function check_connection () {
 function unmount () {
 
     #Unmount the mounted partitions recursively
-    umount -R \"$INSTALL_PATH\"
+    umount -R \"$MOUNT_PATH\"
 
     swapoff \"$SWAP_PARTITION\"
+
+    sleep 2s
 
     if [ \"$IS_ENCRYPT\" == \"true\" ]; then
     
@@ -491,13 +496,10 @@ function unmount () {
         cryptsetup close \"$HOME_PARTITION\"
         cryptsetup close \"$SYSTEM_PARTITION\"
 
-        if [ -n \"$ENCRYPT_PARTITION\" ]; then
+        for i in \$ENCRYPT_PARTITION; do
 
-            for i in $ENCRYPT_PARTITION; do
-
-                cryptsetup close \"\$i\"
-            done
-        fi
+            cryptsetup close \"\$i\"
+        done
     fi
     
     partprobe
@@ -518,7 +520,9 @@ function prompt_warning () {
 }
 function prompt_info () {
 
+    echo
     printf "${YELLOW}%s${NOCOLOUR}" "$1"
+    echo
     echo
 }
 
@@ -534,7 +538,7 @@ echo "#The aur function (will be called in chroot)
 function aur () {
 
     #Make a github directory and clone yay (will be called in user's terminal)
-    function clone_yay () {
+    function install_yay () {
 
         #Generating home directories
         prompt_info \"Generating home directories...\"
@@ -542,11 +546,17 @@ function aur () {
 
         check_connection
 
-        cd \"/home/$USER_NAME\" || failure \"Cannot change directory to /home/$USER_NAME.\"
+        prompt_info \"Cloning yay...\"
+        cd \"/home/$USER_NAME\" || failure \"Cannot change directory to /home/$USER_NAME\"
         mkdir -p Git-Hub || failure \"/home/$USER_NAME/Git-Hub directory couldn't made.\"
-        cd Git-Hub || failure \"Cannot change directory to /home/$USER_NAME/Git-Hub.\"
+        cd Git-Hub || failure \"Cannot change directory to /home/$USER_NAME/Git-Hub\"
 
         git clone https://aur.archlinux.org/yay.git || failure \"Cannot clone yay.\"
+
+        #Install yay.
+        prompt_info \"Installing yay...\"
+        cd yay || failure \"Cannot change directory to /home/$USER_NAME/Git-Hub/yay\"
+        makepkg -si --noconfirm || failure \"Error Cannot install yay!\"
     }
 
     #Generating home directories
@@ -557,15 +567,11 @@ function aur () {
     prompt_info \"Installing go for aur helper... -yay-\"
     pacman -S --noconfirm go
     
-    #Export clone_yay function to call it in the user's shell
-    export -f clone_yay
-    prompt_info \"Cloning yay...\"
-    su \"$USER_NAME\" /bin/bash -c clone_yay
+    #Export functions to call it in the user's shell
+    export -f install_yay
+    export -f check_connection
 
-    #Install yay.
-    prompt_info \"Installing yay...\"
-    cd \"/home/$USER_NAME/Git-Hub/yay\" || failure \"Cannot change directory to /home/$USER_NAME/Git-Hub.\"
-    sudo -u \"$USER_NAME\" makepkg -si --noconfirm || failure \"Error Cannot install yay!\"
+    su \"$USER_NAME\" /bin/bash -c install_yay
     
     #Download pkgbuilds
     prompt_info \"Downloading pkgbuilds...\"
@@ -578,16 +584,25 @@ function aur () {
         
         cd \"/home/$USER_NAME/\" || failure \"Cannot change directory to /home/$USER_NAME/\"
     fi
-    sudo -u \"$USER_NAME\" yay --getpkgbuild $AUR_PACKAGES || failure \"Cannot download pkgbuilds!\"
+    yay --getpkgbuild $AUR_PACKAGES || failure \"Cannot download pkgbuilds!\"
+
+    #Arrange permissions
+    chown -R \"$USER_NAME:$USER_NAME\" \"/home/$USER_NAME/.cache/\"
 "
 
 echo '    #Install aur packages
     prompt_info "Installing aur packages..."
-    find -type f -name "PKGBUILD" -exec makepkg -si --noconfirm {} \;
+    cd "/home/$USER_NAME/.cache/yay"
+    for i in *; do
+
+        cd "$i"
+        sudo -u "$USER_NAME" makepkg -si --noconfirm
+        cd ..
+    done
 '
 
-echo "    #Check if /etc/lightdm directory exists
-    if [ -d \"/etc/lightdm\" ]; then
+echo "    #Check if /etc/lightdm.conf exists
+    if [ -f \"/etc/lightdm/lightdm.conf\" ]; then
     
         prompt_info \"Enabling $SELECTED_GREETER...\"
         declare LIGHTDM_CONF=\"\"
@@ -612,7 +627,7 @@ echo "    #Check if /etc/lightdm directory exists
     prompt_info \"Enabling services...\"
     for i in $SERVICES; do
         
-        systemctl enable \$i || {prompt_warning \"Cannot enable \$i service!\"; echo \"\"; echo \"\$i\" >> /disabled_services.txt; prompt_warning \"Service added to /disabled_services.txt, Please enable it manually.\"; }
+        systemctl enable \$i || { prompt_warning \"Cannot enable \$i service!\"; echo \"\"; echo \"\$i\" >> /\$HOME/disabled_services.txt; prompt_warning \"Service added to /\$HOME/disabled_services.txt, Please enable it manually.\"; }
     done
 
     #Generate initramfs
@@ -628,7 +643,7 @@ echo "    #Check if /etc/lightdm directory exists
 
 echo '
 # ---------------------------------------------------------------------------- #
-#                              Script starts here                              #
+#                           Second Phase Starts Here                           #
 # ---------------------------------------------------------------------------- #
 
 '
@@ -642,11 +657,13 @@ export NOCOLOUR="$NOCOLOUR"
 echo "#Export functions to be able to use in chroot
 export -f prompt_info
 export -f prompt_warning
+export -f check_conection
 export -f failure
+export -f Exit_
 export -f aur
 
 #Run aur function
-arch-chroot \"$INSTALL_PATH\" /bin/bash -c \"aur\"
+arch-chroot \"$MOUNT_PATH\" /bin/bash -c \"aur\" || failure \"Error!\"
 
 prompt_warning \"ARCH SETUP FINISHED!!\"
 prompt_warning \"You can safely reboot now.\"
@@ -703,9 +720,9 @@ while true; do
     if [ "$DEVICE" == "$CHECK" ]; then
 
         VOLGROUP="$DEVICE"VolGroup
-        INSTALL_PATH="/INSTALL/$DEVICE"
+        MOUNT_PATH="$HOME/INSTALL/$DEVICE"
 
-        mkdir -p "$INSTALL_PATH"
+        mkdir -p "$MOUNT_PATH"
         break
     else
 
@@ -727,11 +744,11 @@ unmount
 #Check if system is UEFI
 if [ -d /sys/firmware/efi/efivars ]; then
 
-    prompt_info "System boot mode detected as UEFI."
+    printf "${LIGHT_GREEN}System boot mode detected as ${LIGHT_CYAN}UEFI${NOCOLOUR}\n\n"
     IS_UEFI="true"
 else
 
-    prompt_info "System boot mode detected as legacy BIOS."
+    printf "${LIGHT_GREEN}System boot mode detected as ${LIGHT_CYAN}Legacy BIOS${NOCOLOUR}\n\n"
     IS_UEFI="false"
 fi
 
@@ -761,9 +778,13 @@ fi
 #In the below link, you can find the answer for the question of - Why first partition generally starts from sector 2048 (1mib)? -
 #https://www.thomas-krenn.com/en/wiki/Partition_Alignment_detailed_explanation
 
-printf "${LIGHT_CYAN}Do you want to use auto partitioning? ${LIGHT_RED}- All data will be ERASED! -${LIGHT_CYAN} (y/n): ${NOCOLOUR}"
+
+printf "${PURPLE}Your data will be ${LIGHT_RED}ERASED INDEPENDENTLY${PURPLE} of your answer!${NOCOLOUR}\n"
+prompt_question "Do you want to use auto partitioning? (y/n): "
 yes_no
 if [ "$ANSWER" == "y" ]; then
+
+    IS_AUTO_PARTITIONING="true"
 
     #GPT is required for disks that are bigger than 2TiB
     if (( DISK_SIZE_TIB > 2 )); then
@@ -771,7 +792,7 @@ if [ "$ANSWER" == "y" ]; then
         PARTITION_TABLE="gpt"
     fi
 
-    #Sizing                                             #Scheme used
+    #Sizing                                             #Schemes used
     #BIOS Grub - 1mib
     #EFI System Partition [ESP] - 512mib                https://superuser.com/questions/1310927/what-is-the-absolute-minimum-size-a-uefi-system-partition-can-be/1310938#1310938
     #Boot - 500mib
@@ -1001,7 +1022,9 @@ if [ "$ANSWER" == "y" ]; then
         fi
     fi
 else #Manual partition selection
-    
+
+    IS_AUTO_PARTITIONING="false"
+
     #Partition table is not suitable for linux
     if [ "$PARTITION_TABLE" == "other" ]; then
     
@@ -1056,7 +1079,7 @@ else #Manual partition selection
                 prompt_info "Opening $i..."
                 cryptsetup open "$i" LUKS$current_ || failure "Error! try rebooting."
 
-		IS_ENCRYPT="true"
+                IS_ENCRYPT="true"
                 ENCRYPT_PARTITION+=" $i"
             fi
         done
@@ -1172,7 +1195,7 @@ sleep 7s
 #Scheme used:
 #https://wiki.archlinux.org/title/Dm-crypt/Encrypting_an_entire_system#LVM_on_LUKS
 
-if [ "$IS_ENCRYPT" == "true" ]; then
+if output=$([ "$IS_ENCRYPT" == "true" ] && [ "$IS_AUTO_PARTITIONING" == "true" ]); then
 
     clear
     prompt_info "Encrypting $ENCRYPT_PARTITION..."
@@ -1188,6 +1211,7 @@ if [ "$IS_ENCRYPT" == "true" ]; then
 
     prompt_info "Opening $ENCRYPT_PARTITION..."
     cryptsetup open "$ENCRYPT_PARTITION" cryptlvm
+    ENCRYPT_PARTITION="/dev/mapper/cryptlvm"
 
     #Prepare logical volumes
     clear
@@ -1236,27 +1260,30 @@ fi
 prompt_info "Mounting..."
 
 #System
-mkdir -p "$INSTALL_PATH"
-mount "$SYSTEM_PARTITION" "$INSTALL_PATH"
+mkdir -p "$MOUNT_PATH"
+mount "$SYSTEM_PARTITION" "$MOUNT_PATH"
 
 #ESP
 #https://wiki.archlinux.org/title/EFI_system_partition#Mount_the_partition
 if [ "$IS_UEFI" == "true" ]; then
 
-    mkdir -p "$INSTALL_PATH/efi"
-    mount "$ESP" "$INSTALL_PATH/efi"
+    mkdir -p "$MOUNT_PATH/efi"
+    mount "$ESP" "$MOUNT_PATH/efi"
 fi
 
 #Boot
-mkdir -p "$INSTALL_PATH/boot"
-mount "$BOOT_PARTITION" "$INSTALL_PATH/boot"
+mkdir -p "$MOUNT_PATH/boot"
+mount "$BOOT_PARTITION" "$MOUNT_PATH/boot"
 
 #Home
 if [ "$IS_SEPERATE" == "true" ]; then
     
-    mkdir -p "$INSTALL_PATH/home"
-    mount "$HOME_PARTITION" "$INSTALL_PATH/home"
+    mkdir -p "$MOUNT_PATH/home"
+    mount "$HOME_PARTITION" "$MOUNT_PATH/home"
 fi
+
+printf "${LIGHT_GREEN}Mounted on ${LIGHT_CYAN}%s${NOCOLOUR}" "$MOUNT_PATH"
+sleep 5s
 
 
 # ----------------------------- Package Selection ---------------------------- #
@@ -1265,7 +1292,6 @@ PACKAGES+="$PKG_SELECT"
 
 pkg_select "$ADDITIONAL_AUR_PACKAGES"
 AUR_PACKAGES+="$PKG_SELECT"
-
 
 print_packages
 
@@ -1291,7 +1317,7 @@ print_packages
 
 #Sort mirrorslist
 check_connection
-printf "${LIGHT_GREEN}Do you want to sort the mirror list to make the downloads faster?${LIGHT_RED} - might take a while - ${LIGHT_GREEN}(y/n): ${NOCOLOUR}"
+printf "${LIGHT_GREEN}Do you want to sort the mirror list to make the downloads faster?${LIGHT_RED} -It will persist in the installation but will take a while - ${LIGHT_GREEN}(y/n): ${NOCOLOUR}"
 yes_no
 if [ "$ANSWER" == "y" ]; then
 
@@ -1310,11 +1336,11 @@ for i in {5..0}; do
     sleep 1s
 done
 
-pacstrap "$INSTALL_PATH" $CORE_PACKAGES $PACKAGES $BOOTLOADER_PACKAGES $DISPLAY_MANAGER $DE_PACKAGES $DE_DEPENDENT_PACKAGES
+pacstrap "$MOUNT_PATH" $CORE_PACKAGES $PACKAGES $BOOTLOADER_PACKAGES $DISPLAY_MANAGER $DE_PACKAGES $DE_DEPENDENT_PACKAGES
 
 #Generate fstab
 prompt_info "Generating fstab..."
-genfstab -U "$INSTALL_PATH" >> "$INSTALL_PATH/etc/fstab"
+genfstab -U "$MOUNT_PATH" >> "$MOUNT_PATH/etc/fstab"
 
 
 # ---------------------------------------------------------------------------- #
@@ -1328,20 +1354,22 @@ function setup () {
     declare -i max=0
     
     LIST="$(timedatectl list-timezones)"
+    max=$(echo "$LIST" | cat -n | tail -1 | awk '{print $1}')
     
     prompt_different "Please find your timezone in the list."
     echo
-    printf "${YELLOW}About to list timezones... ${LIGHT_RED}(Press q to quit and use pg-up, pg-down to move faster.)${NOCOLOUR}"
+    printf "${YELLOW}About to list timezones... ${LIGHT_RED}(Press q to quit and use / to search.)${NOCOLOUR}"
     echo
     prompt_warning "Press any key to continue..."
     read -e -r TMP
     
     #List timezones
     {
+        declare -i n=0
         for i in $LIST; do
     
-            max+=1
-            printf "${LIGHT_CYAN}%s ${NOCOLOUR}" "$max"
+            n+=1
+            printf "${LIGHT_CYAN}%s ${NOCOLOUR}" "$n"
             printf "${PURPLE}%s${NOCOLOUR}\n" "$i"
         done
     } | less --raw-control-chars
@@ -1368,27 +1396,31 @@ function setup () {
     printf "LANG=en_US.UTF-8" > /etc/locale.conf
     
     #Keymap
-    prompt_question "Have you set your keyboard layout? (y/n): "
-    yes_no
-    if [ "$ANSWER" == "y" ]; then
-    
-        printf "${LIGHT_GREEN}Please write your keyboard layout in the file that is going to open. ${LIGHT_RED}(ex: KEYMAP=de-latin1)${NOCOLOUR}\n"
-        printf "${LIGHT_GREEN}You can press ${LIGHT_RED}Ctrl-S${LIGHT_GREEN} to save and ${LIGHT_RED}Ctrl-X${LIGHT_GREEN} to exit.${NOCOLOUR}\n"
-        prompt_warning "Press any key to continue..."
-        read -e -r TMP
-        printf "KEYMAP=" > /etc/vconsole.conf
-        nano /etc/vconsole.conf
+    if [ ! -f /etc/vconsole.conf ]; then
+
+        prompt_question "Have you set your keyboard layout? (y/n): "
+        yes_no
+        if [ "$ANSWER" == "y" ]; then
+            
+            printf "${LIGHT_GREEN}Please write your keyboard layout in the file that is going to open. ${LIGHT_RED}(ex: KEYMAP=de-latin1)${NOCOLOUR}\n"
+            printf "${LIGHT_GREEN}You can press ${LIGHT_RED}Ctrl-S${LIGHT_GREEN} to save and ${LIGHT_RED}Ctrl-X${LIGHT_GREEN} to exit.${NOCOLOUR}\n"
+            prompt_warning "Press any key to continue..."
+            read -e -r TMP
+            nano /etc/vconsole.conf
+        fi
     fi
-    
+
     #Hostname
     prompt_info "Generating /etc/hostname..."
     printf "%s" "$DEVICE" > /etc/hostname
     
     #Hosts
     prompt_info "Generating /etc/hosts..."
-    printf "127.0.0.1      localhost\n"
-    printf "::1            localhost\n"
-    printf "127.0.1.1      %s.localdomain    %s" "$DEVICE" "$DEVICE"
+    {
+        printf "127.0.0.1      localhost\n"
+        printf "::1            localhost\n"
+        printf "127.0.1.1      %s.localdomain    %s" "$DEVICE" "$DEVICE"
+    } >> /etc/hosts
     
     #Initramfs
     if [ "$IS_ENCRYPT" == "true" ]; then
@@ -1477,7 +1509,7 @@ function setup () {
         prompt_warning "Cannot modify /etc/sudoers!"
         prompt_warning "You have to modify it manually."
         
-        printf "${LIGHT_GREEN}Just uncomment the ${LIGHT_RED}'# %sudo...'${LIGHT_GREEN} line.${NOCOLOUR}"
+        echo "${LIGHT_GREEN}Just uncomment the ${LIGHT_RED}'# %sudo...'${LIGHT_GREEN} line.${NOCOLOUR}"
         prompt_warning "Press any key to continue..."
         read -e -r TMP
         
@@ -1499,12 +1531,15 @@ function setup () {
     done
     
     #Setting root password
-    printf "Root "
+    printf "${LIGHT_RED}Root "
     while ! passwd root; do
 
         prompt_warning "Try again."
+        printf "${LIGHT_RED}Root "       
     done
-    
+
+    printf "${NOCOLOUR}"
+
     #Pass username to second phase
     printf "%s" "$USER_NAME" > /user_name.txt
     
@@ -1515,13 +1550,14 @@ function setup () {
 export NUMBER_CHECK="$NUMBER_CHECK"
 export ANSWER="$ANSWER"
 export DEVICE="$DEVICE"
-export INSTALL_PATH="$INSTALL_PATH"
+export MOUNT_PATH="$MOUNT_PATH"
 export IS_ENCRYPT="$IS_ENCRYPT"
 export DISK="$DISK"
 export ENCRYPT_PARTITION="$ENCRYPT_PARTITION"
 export VOLGROUP="$VOLGROUP"
 
 export YELLOW="$YELLOW"
+export PURPLE="$PURPLE"
 export LIGHT_RED="$LIGHT_RED"
 export LIGHT_CYAN="$LIGHT_CYAN"
 export LIGHT_GREEN="$LIGHT_GREEN"
@@ -1537,7 +1573,7 @@ export -f prompt_different
 
 export -f setup
 
-arch-chroot "$INSTALL_PATH" /bin/bash -c "setup"
+arch-chroot "$MOUNT_PATH" /bin/bash -c "setup"
 
 #Setup second phase
 setup_second_phase
