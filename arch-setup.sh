@@ -129,7 +129,7 @@ trap clean_up SIGHUP SIGINT SIGTERM
 
 function clean_up () {
 
-    rm -f "$MOUNT_PATH/$USER_NAME_TMP_FILE"
+    rm -f "$MOUNT_PATH$USER_NAME_TMP_FILE"
     rm -f "/tmp/$PROGRAM_NAME.lock"
     echo
     prompt_warning "Signal received..."
@@ -275,59 +275,118 @@ function yes_no () {
     if [ "$ANSWER" == "N" ]; then ANSWER="n"; fi
 }
 
-
+#If no arguments passed, read it from the user.
+#And check the input. If user entered wrongly
+#loop until correct answer is get else return either 0 -true- or 12 -false-
 function disk_check () {
 
     declare INPUT=""
-    read -e -r INPUT
+    declare IS_ARGUMENT=""
+    
+    if [ -n "$1" ]; then
+    
+        IS_ARGUMENT="true"
+        INPUT="$1"
+    else
+        
+        IS_ARGUMENT="false"
+        read -e -r INPUT
+    fi
+    
 
     #Use awk to remove unnecessary spaces
     while ! output=$(lsblk -o type,path | awk '{print $1,$2}'| grep -x "disk $INPUT"); do
     
-        prompt_warning "The disk '$INPUT' couldn't found."
-        printf "${LIGHT_RED}Please try again: ${NOCOLOUR}"
-        read -e -r INPUT
+        if [ "$IS_ARGUMENT" == "false" ]; then
+            
+            prompt_warning "The disk '$INPUT' couldn't found."
+            printf "${LIGHT_RED}Please try again: ${NOCOLOUR}"
+            read -e -r INPUT
+        else
+        
+            return 12
+        fi
     done
 
    DISK_CHECK="$INPUT"
 }
 
 
+#If no arguments passed, read it from the user.
+#And check the input. If user entered wrongly
+#loop until correct answer is get else return either 0 -true- or 13 -false-
 function partition_check () {
 
     declare INPUT=""
-    read -e -r INPUT
+    declare IS_ARGUMENT=""
+    
+    if [ -n "$1" ]; then
+    
+        IS_ARGUMENT="true"
+        INPUT="$1"
+    else
+        
+        IS_ARGUMENT="false"
+        read -e -r INPUT
+    fi
 
     #Use awk to remove unnecessary spaces
     while ! output=$(lsblk -o type,path "$DISK" | awk '{print $1,$2}' | grep -v "disk" | grep "$INPUT"); do
     
-        prompt_warning "Partition '$INPUT' couldn't found."
-        printf "${LIGHT_RED}Please try again: ${NOCOLOUR}"
-        read -e -r INPUT
+        if [ "$IS_ARGUMENT" == "false" ]; then
+            
+            prompt_warning "Partition '$INPUT' couldn't found."
+            printf "${LIGHT_RED}Please try again: ${NOCOLOUR}"
+            read -e -r INPUT
+        else
+        
+            return 13
+        fi
     done
 
    PART_CHECK="$INPUT"
 }
 
 
+#If no arguments passed, read it from the user.
+#And check the input. If user entered wrongly
+#loop until correct answer is get else return either 0 -true- or 14 -false-
 function number_check () {
 
     declare max_=0
     
+    #Max_ cannot be zero nor char
     if output=$([[ ! $1 =~ ^[0-9]+$ ]] || (( $1 == 0 )) ); then
     
-        failure "Function number_check: INTERNAL ERROR! Wrong input received: \"$1\". -Revise the code-"
+        failure "number_check INTERNAL ERROR! Wrong input received. (\$1: $1) -Revise the code-"
     else
     
         max_=$1
     fi
     
-    read -e -r NUMBER_CHECK
+    
+    declare IS_ARGUMENT=""
+    if [ -n "$2" ]; then
+    
+        IS_ARGUMENT="true"
+        INPUT="$2"
+    else
+        
+        IS_ARGUMENT="false"
+        read -e -r INPUT
+    fi
+    
     while output=$( [[ ! $NUMBER_CHECK =~ ^[0-9]+$ ]] || (( NUMBER_CHECK > max_ )) || (( NUMBER_CHECK == 0 )) ); do
     
-        prompt_warning "Wrong number!"
-        prompt_question "Please re-enter: "
-        read -e -r NUMBER_CHECK
+        if [ "$IS_ARGUMENT" == "false" ]; then
+            
+            prompt_warning "Wrong number!"
+            prompt_question "Please re-enter: "
+            read -e -r NUMBER_CHECK
+        else
+        
+            return 14
+        fi
     done
 }
 
@@ -473,8 +532,8 @@ function setup-second-phase () {
 
 #Get user name that taken after first phase and delete that file
 declare USER_NAME=""
-USER_NAME=$(cat "$MOUNT_PATH/$USER_NAME_TMP_FILE")
-rm -f "$MOUNT_PATH/$USER_NAME_TMP_FILE"
+USER_NAME=$(cat "$MOUNT_PATH$USER_NAME_TMP_FILE")
+rm -f "$MOUNT_PATH$USER_NAME_TMP_FILE"
 
 #Inform the user (still in first phase)
 prompt_info "Generating setup-second-phase.sh..."
@@ -706,7 +765,7 @@ echo '    #Install aur packages
 echo "    #Check if /etc/lightdm.conf exists
     if [ -f \"/etc/lightdm/lightdm.conf\" ]; then
     
-        if [ -n \"\$(pacman -Q | grep -w \$SELECTED_GREETER\"];
+        if pacman -Q | grep -q -w \"\$SELECTED_GREETER\"; then
         
             prompt_info \"Enabling \$SELECTED_GREETER...\"
             declare LIGHTDM_CONF=\"\"
@@ -854,9 +913,7 @@ check_connection
 
 #Activate time synchronization
 prompt_info "Activating time synchronization..."
-{
-    timedatectl set-ntp true
-} &>> /dev/null
+timedatectl set-ntp true &> /dev/null
 
 #Get device name
 while true; do
@@ -1501,26 +1558,47 @@ function setup () {
     LIST="$(timedatectl list-timezones)"
     max=$(echo "$LIST" | cat -n | tail -1 | awk '{print $1}')
     
+    function list_timezones {
+    
+        {
+            declare -i n=0
+            for i in $LIST; do
+        
+                n+=1
+                printf "${LIGHT_CYAN}%s ${NOCOLOUR}" "$n"
+                printf "${PURPLE}%s${NOCOLOUR}\n" "$i"
+            done
+        } | less --raw-control-chars
+    }
+    
     prompt_different "Please find your timezone in the list."
     echo
-    printf "${YELLOW}About to list timezones... ${LIGHT_RED}(Press 'q' to quit and use '/' to search.)${NOCOLOUR}"
+    printf "${YELLOW}About to list timezones... ${LIGHT_RED}(Press 'q' to quit and use '/' to search)${NOCOLOUR}"
     echo
     prompt_warning "Press any key to continue..."
     read -e -r TMP
     
-    #List timezones
-    {
-        declare -i n=0
-        for i in $LIST; do
+    list_timezones
+    declare INPUT=""
+    while true; do
     
-            n+=1
-            printf "${LIGHT_CYAN}%s ${NOCOLOUR}" "$n"
-            printf "${PURPLE}%s${NOCOLOUR}\n" "$i"
-        done
-    } | less --raw-control-chars
-
-    prompt_question "Please specify the number of your timezone: "
-    number_check "$max"
+        prompt_question "Please specify the number of your timezone -Type 'r' to re-list-: "
+        read -e -r INPUT
+        
+        if [ "$INPUT" == "r" ]; then
+        
+            list_timezones
+        else
+        
+            if number_check "$max" "$INPUT"; then
+            
+                break
+            else
+            
+                prompt_warning "Wrong Number!"
+            fi
+        fi
+    done
     
     TIMEZONE=$(echo "$LIST" | head -"$NUMBER_CHECK" | tail -1)
     prompt_info "Setting timezone..."
@@ -1681,7 +1759,7 @@ function setup () {
     printf "${NOCOLOUR}"
 
     #Pass username to second phase
-    #We are in chroot, so the actual location in $MOUNT_PATH/$USER_NAME_TMP_FILE
+    #We are in chroot, so the actual location is $MOUNT_PATH$USER_NAME_TMP_FILE
     printf "%s" "$USER_NAME" > "$USER_NAME_TMP_FILE"
     
     prompt_warning "Installation complete!"
