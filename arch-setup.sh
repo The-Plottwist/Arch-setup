@@ -499,6 +499,7 @@ declare LIGHT_GREEN='\033[1;32m'
 declare NOCOLOUR='\033[0m' #No Colour
 
 declare MOUNT_PATH=\"$MOUNT_PATH\"
+declare DISK=\"$DISK\"
 
 declare IS_ENCRYPT=\"$IS_ENCRYPT\"
 declare ENCRYPT_PARTITION=\"$ENCRYPT_PARTITION\"
@@ -530,31 +531,76 @@ function check_connection () {
 
     { ping wiki.archlinux.org -c 1 &>> /dev/null; } || failure \"No internet connection!\"
 }
+"
 
-function Umount_ () {
+echo 'function Umount_ () {
 
-    #Unmount the mounted partitions recursively
-    umount -R \"\$MOUNT_PATH\"
-
-    swapoff \"\$SWAP_PARTITION\"
-
-    sleep 2s
-
-    if [ \"\$IS_ENCRYPT\" == \"true\" ]; then
+    declare MOUNTPOINTS_U=""
+    declare SWAPS_U=""
+    declare CRYPT_U=""
+    declare LVM_U=""
+    declare LUKS_U=""
     
-        cryptsetup close \"\$SWAP_PARTITION\"
-        cryptsetup close \"\$HOME_PARTITION\"
-        cryptsetup close \"\$SYSTEM_PARTITION\"
-
-        for i in \$ENCRYPT_PARTITION; do
-
-            cryptsetup close \"\$i\"
-        done
+    MOUNTPOINTS_U=$(lsblk -o mountpoints "$DISK" | grep "/" | sort --reverse)
+    SWAPS_U=$(lsblk -o mountpoints,path "$DISK" | grep "\[SWAP\]" | awk '\''{print $2}'\'')
+    CRYPT_U=$(lsblk -o type,path "$DISK")
+    LVM_U=$(echo "$CRYPT_U" | grep -w "lvm" | awk '\''{print $2}'\'')
+    LUKS_U=$(echo "$CRYPT_U" | grep -w "crypt" | awk '\''{print $2}'\'')
+    
+    if output=$([ -n "$MOUNTPOINTS_U" ] && [ -n "$SWAPS_U" ] && [ -n "$CRYPT_U" ] && [ -n "$LVM_U" ] && [ -n "$LUKS_U" ]); then
+    
+        prompt_info "Unmounting please wait..."
+    
+        #Umount
+        if [ -n "$MOUNTPOINTS_U" ]; then
+    
+            for i in $MOUNTPOINTS_U; do
+    
+                   umount "$i"
+            done
+    
+            sleep 3s
+        fi
+    
+        #Swapoff
+        if [ -n "$SWAPS_U" ]; then
+    
+            for i in $SWAPS_U; do
+                    
+                swapoff "$i"
+            done
+    
+            sleep 3s
+        fi
+    
+        #Logical volumes
+        if [ -n "$LVM_U" ]; then
+        
+            for i in $LVM_U; do
+            
+                cryptsetup close "$i"
+            done
+    
+            sleep 3s
+        fi
+    
+        #LUKS partitions
+        if [ -n "$LUKS_U" ]; then
+        
+            for i in $LUKS_U; do
+            
+                cryptsetup close "$i"
+            done
+    
+            sleep 3s
+        fi
     fi
-    
+
+    #Inform the kernel
+    prompt_info "Informing kernel of partition changes..."
     partprobe
 }
-"
+'
 
 echo 'function Exit_ () {
 
@@ -660,20 +706,33 @@ echo '    #Install aur packages
 echo "    #Check if /etc/lightdm.conf exists
     if [ -f \"/etc/lightdm/lightdm.conf\" ]; then
     
-        prompt_info \"Enabling \$SELECTED_GREETER...\"
-        declare LIGHTDM_CONF=\"\"
-        LIGHTDM_CONF=\$(sed \"s/#greeter-session=example-gtk-gnome/greeter-session=\$SELECTED_GREETER/g\" /etc/lightdm/lightdm.conf)
-        sleep 1s
-        if [ -n \"\$LIGHTDM_CONF\" ]; then
+        if [ -n \"\$(pacman -Q | grep -w \$SELECTED_GREETER\"];
         
-            prompt_info \"Backing up /etc/lightdm/lightdm.conf to /etc/lightdm/lightdm.conf.backup...\"
-            mv /etc/lightdm/lightdm.conf /etc/lightdm/lightdm.conf.backup
-            echo \"\$LIGHTDM_CONF\" > /etc/lightdm/lightdm.conf
+            prompt_info \"Enabling \$SELECTED_GREETER...\"
+            declare LIGHTDM_CONF=\"\"
+            LIGHTDM_CONF=\$(sed \"s/#greeter-session=example-gtk-gnome/greeter-session=\$SELECTED_GREETER/g\" /etc/lightdm/lightdm.conf)
+            sleep 1s
+            if [ -n \"\$LIGHTDM_CONF\" ]; then
+            
+                prompt_info \"Backing up /etc/lightdm/lightdm.conf to /etc/lightdm/lightdm.conf.backup...\"
+                mv /etc/lightdm/lightdm.conf /etc/lightdm/lightdm.conf.backup
+                echo \"\$LIGHTDM_CONF\" > /etc/lightdm/lightdm.conf
+            else
+            
+                prompt_warning \"Cannot modify /etc/lightdm/lightdm.conf file.\"
+                prompt_warning \"You have to modify it manually.\"
+                printf \"\${LIGHT_RED}greeter-session=example-gtk-gnome \${LIGHT_GREEN}should be equal to \${LIGHT_RED}greeter_session=\$SELECTED_GREETER \${LIGHT_GREEN}-which is under the [Seat:*] section-\${NOCOLOUR}\"
+                
+                prompt_warning \"Press any key to continue...\"
+                read -e -r TMP
+            fi
         else
         
-            prompt_warning \"Cannot modify /etc/lightdm/lightdm.conf file.\"
-            prompt_warning \"You have to modify it manually.\"
-            prompt warning \"greeter-session=example-gtk-gnome should be equal to greeter_session=\$SELECTED_GREETER (which is under the [Seat:*] section).\"
+            prompt_warning \"\$SELECTED_GREETER is not installed!\"
+            prompt_warning \"Skipping activation.\"
+            prompt_warning \"You have to modify /etc/lightdm/lightdm.conf file manually after the installation.\"
+            printf \"\${LIGHT_RED}greeter-session=example-gtk-gnome \${LIGHT_GREEN}should be equal to \${LIGHT_RED}greeter_session=\$SELECTED_GREETER \${LIGHT_GREEN}-which is under the [Seat:*] section-\${NOCOLOUR}\"
+            
             prompt_warning \"Press any key to continue...\"
             read -e -r TMP
         fi
@@ -1403,7 +1462,7 @@ print_packages
 
 #Sort mirrorslist
 check_connection
-printf "${LIGHT_GREEN}Do you want to sort the mirror list to make the downloads faster?${LIGHT_RED} -It will persist in the system but will take a while - ${LIGHT_GREEN}(y/n): ${NOCOLOUR}"
+printf "${LIGHT_GREEN}Do you want to sort the mirror list to make the downloads faster?${LIGHT_RED} -It will persist in the system but will take a while- ${LIGHT_GREEN}(y/n): ${NOCOLOUR}"
 yes_no
 if [ "$ANSWER" == "y" ]; then
 
@@ -1616,7 +1675,7 @@ function setup () {
     while ! passwd root; do
 
         prompt_warning "Try again."
-        printf "${LIGHT_RED}Root "       
+        printf "${LIGHT_RED}Root "
     done
 
     printf "${NOCOLOUR}"
