@@ -37,7 +37,7 @@
 # ---------------------------------- Globals --------------------------------- #
 
 declare PROGRAM_NAME=""
-PROGRAM_NAME="$0"
+PROGRAM_NAME="arch-setup.sh"
 
 declare USER_NAME_TMP_FILE=""
 USER_NAME_TMP_FILE="/tmp/$PROGRAM_NAME.$$.$RANDOM"
@@ -60,7 +60,6 @@ declare DISK_SIZE_MIB=""
 declare IS_UEFI=""
 declare IS_ENCRYPT=""
 declare IS_SEPERATE=""
-declare IS_AUTO_PARTITIONING=""
 declare ESP=""
 declare IS_ESP_FORMAT=""
 declare BOOT_PARTITION=""
@@ -173,80 +172,78 @@ function prompt_path () {
 }
 
 
-function unmount () {
+function Umount_ () {
 
-    prompt_info "Unmounting please wait..."
-
-    #Umount
     declare MOUNTPOINTS_U=""
-    MOUNTPOINTS_U=$(lsblk -o mountpoints "$DISK" | grep "/" | sort --reverse)
-    
-    if [ -n "$MOUNTPOINTS_U" ]; then
-
-        for i in $MOUNTPOINTS_U; do
-
-               umount "$i"
-        done
-
-        sleep 3s
-    fi
-
-    #Swapoff
     declare SWAPS_U=""
-    SWAPS_U=$(lsblk -o mountpoints,path "$DISK" | grep "\[SWAP\]" | awk '{print $2}')
-
-    if [ -n "$SWAPS_U" ]; then
-
-        for i in $SWAPS_U; do
-                
-            swapoff "$i"
-        done
-
-        sleep 3s
-    fi
-
-    #Shared variable
     declare CRYPT_U=""
-    CRYPT_U=$(lsblk -o type,path "$DISK")
-
-    #Logical volumes
     declare LVM_U=""
-    LVM_U=$(echo "$CRYPT_U" | grep -w "lvm" | awk '{print $2}')
-    
-    if [ -n "$LVM_U" ]; then
-    
-        for i in $LVM_U; do
-        
-            cryptsetup close "$i"
-        done
-
-        sleep 3s
-    fi
-
-    #LUKS partitions
     declare LUKS_U=""
+    
+    MOUNTPOINTS_U=$(lsblk -o mountpoints "$DISK" | grep "/" | sort --reverse)
+    SWAPS_U=$(lsblk -o mountpoints,path "$DISK" | grep "\[SWAP\]" | awk '{print $2}')
+    CRYPT_U=$(lsblk -o type,path "$DISK")
+    LVM_U=$(echo "$CRYPT_U" | grep -w "lvm" | awk '{print $2}')
     LUKS_U=$(echo "$CRYPT_U" | grep -w "crypt" | awk '{print $2}')
     
-    #Check if LUKS_U is non-zero
-    if [ -n "$LUKS_U" ]; then
+    if output=$([ -n "$MOUNTPOINTS_U" ] && [ -n "$SWAPS_U" ] && [ -n "$CRYPT_U" ] && [ -n "$LVM_U" ] && [ -n "$LUKS_U" ]); then
     
-        for i in $LUKS_U; do
+        prompt_info "Unmounting please wait..."
+    
+        #Umount
+        if [ -n "$MOUNTPOINTS_U" ]; then
+    
+            for i in $MOUNTPOINTS_U; do
+    
+                   umount "$i"
+            done
+    
+            sleep 3s
+        fi
+    
+        #Swapoff
+        if [ -n "$SWAPS_U" ]; then
+    
+            for i in $SWAPS_U; do
+                    
+                swapoff "$i"
+            done
+    
+            sleep 3s
+        fi
+    
+        #Logical volumes
+        if [ -n "$LVM_U" ]; then
         
-            cryptsetup close "$i"
-        done
-
-        sleep 3s
+            for i in $LVM_U; do
+            
+                cryptsetup close "$i"
+            done
+    
+            sleep 3s
+        fi
+    
+        #LUKS partitions
+        if [ -n "$LUKS_U" ]; then
+        
+            for i in $LUKS_U; do
+            
+                cryptsetup close "$i"
+            done
+    
+            sleep 3s
+        fi
     fi
 
     #Inform the kernel
-    prompt_info "Informing kernel..."
+    prompt_info "Informing kernel of partition changes..."
     partprobe
 }
 
 
 function Exit_ () {
 
-    unmount
+    Umount_
 
     rm -f "/tmp/$PROGRAM_NAME.lock"
 
@@ -288,7 +285,7 @@ function disk_check () {
     while ! output=$(lsblk -o type,path | awk '{print $1,$2}'| grep -x "disk $INPUT"); do
     
         prompt_warning "The disk '$INPUT' couldn't found."
-        printf "Please try again: "
+        printf "${LIGHT_RED}Please try again: ${NOCOLOUR}"
         read -e -r INPUT
     done
 
@@ -305,7 +302,7 @@ function partition_check () {
     while ! output=$(lsblk -o type,path "$DISK" | awk '{print $1,$2}' | grep -v "disk" | grep "$INPUT"); do
     
         prompt_warning "Partition '$INPUT' couldn't found."
-        printf "Please try again: "
+        printf "${LIGHT_RED}Please try again: ${NOCOLOUR}"
         read -e -r INPUT
     done
 
@@ -329,7 +326,7 @@ function number_check () {
     while output=$( [[ ! $NUMBER_CHECK =~ ^[0-9]+$ ]] || (( NUMBER_CHECK > max_ )) || (( NUMBER_CHECK == 0 )) ); do
     
         prompt_warning "Wrong number!"
-        printf "${LIGHT_CYAN}Please re-enter: ${NOCOLOUR}"
+        prompt_question "Please re-enter: "
         read -e -r NUMBER_CHECK
     done
 }
@@ -441,7 +438,7 @@ function choose_one () {
     echo
     
     #Selection
-    printf "Please choose one: "
+    prompt_question "Please choose one: "
     number_check "$max"
     
     #Include it in the installation
@@ -470,9 +467,9 @@ function choose_one () {
 #                    Second Phase (Will be used at the end)                    #
 # ---------------------------------------------------------------------------- #
 
-#Generate a file called "setup_second_phase.sh"
+#Generate a file called "setup-second-phase.sh"
 #Warning: Mix use of double quotes ("") and single quotes ('')
-function setup_second_phase () {
+function setup-second-phase () {
 
 #Get user name that taken after first phase and delete that file
 declare USER_NAME=""
@@ -480,9 +477,9 @@ USER_NAME=$(cat "$USER_NAME_TMP_FILE")
 rm "$USER_NAME_TMP_FILE"
 
 #Inform the user (still in first phase)
-prompt_info "Generating setup_second_phase.sh..."
+prompt_info "Generating setup-second-phase.sh..."
 
-#Below is the code of "setup_second_phase.sh"
+#Below is the code of "setup-second-phase.sh"
 {
 
 echo "#!/bin/bash
@@ -493,7 +490,7 @@ echo "#!/bin/bash
 # ---------------------------------------------------------------------------- #
 
 declare PROGRAM_NAME=\"\"
-PROGRAM_NAME=\"\$0\"
+PROGRAM_NAME=\"setup-second-phase.sh\"
 
 #Colours for colourful output
 declare LIGHT_RED='\033[1;31m'
@@ -532,7 +529,7 @@ function check_connection () {
     { ping wiki.archlinux.org -c 1 &>> /dev/null; } || failure \"No internet connection!\"
 }
 
-function unmount () {
+function Umount_ () {
 
     #Unmount the mounted partitions recursively
     umount -R \"\$MOUNT_PATH\"
@@ -559,7 +556,7 @@ function unmount () {
 
 echo 'function Exit_ () {
 
-    #unmount
+    #Umount_
 
     rm -f "/tmp/$PROGRAM_NAME.lock"
 
@@ -624,9 +621,6 @@ function aur () {
 
     #Clone yay
     su \"\$USER_NAME\" /bin/bash -c clone_yay || Exit_ \$?
-
-    #Arrange permissions
-    chown -R \"\$USER_NAME:\$USER_NAME\" \"/home/\$USER_NAME/.cache/\"
 
     #Install yay.
     prompt_info \"Installing yay...\"
@@ -744,15 +738,14 @@ arch-chroot \"\$MOUNT_PATH\" /bin/bash -c \"aur\" || Exit_ \$?
 prompt_warning \"ARCH SETUP FINISHED!!\"
 prompt_warning \"You can safely reboot now.\"
 
-#Remove lock
-rm -f \"/tmp/\$PROGRAM_NAME.lock\"
+Umount_
 
-unmount
+Exit_
 "
 
-} > setup_second_phase.sh
+} > setup-second-phase.sh
 
-chmod +x setup_second_phase.sh
+chmod +x setup-second-phase.sh
 
 }
 
@@ -830,7 +823,7 @@ prompt_path "the disk you want to operate: "
 disk_check
 DISK="$DISK_CHECK"
 
-unmount
+Umount_
 
 #Check if system is UEFI
 if [ -d /sys/firmware/efi/efivars ]; then
@@ -875,7 +868,6 @@ prompt_question "Do you want to use auto partitioning? (y/n): "
 yes_no
 if [ "$ANSWER" == "y" ]; then
 
-    IS_AUTO_PARTITIONING="true"
 
     #GPT is required for disks that are bigger than 2TiB
     if (( DISK_SIZE_TIB > 2 )); then
@@ -1114,8 +1106,6 @@ if [ "$ANSWER" == "y" ]; then
     fi
 else #Manual partition selection
 
-    IS_AUTO_PARTITIONING="false"
-
     #Partition table is not suitable for linux
     if [ "$PARTITION_TABLE" == "other" ]; then
     
@@ -1126,7 +1116,8 @@ else #Manual partition selection
     #Inform the user about needed partitions
     clear
     prompt_info "Needed partitions:"
-    printf "\033[1A\033[2K\r"
+    printf "\033[1A\033[2K\r" #Delete unnecessary carriage returns
+    
     if output=$([ "$PARTITION_TABLE" == "gpt" ] && [ "$IS_UEFI" == "false" ]); then
     
         prompt_different "BIOS Grub Partition"
@@ -1152,6 +1143,8 @@ else #Manual partition selection
 
         declare -i current_=0
     
+        prompt_warning "In this option, encrypted partitions will not be handled automatically."
+        prompt_warning "You need to follow one of the guides in: ${LIGHT_CYAN}https://wiki.archlinux.org/title/Dm-crypt/Encrypting_an_entire_system#Overview"
         prompt_info "LUKS partitions found!"
         printf "\033[1A"
         prompt_different "$LUKS"
@@ -1169,9 +1162,6 @@ else #Manual partition selection
     
                 prompt_info "Opening $i..."
                 cryptsetup open "$i" LUKS$current_ || failure "Error! try rebooting."
-
-                IS_ENCRYPT="true"
-                ENCRYPT_PARTITION+=" $i"
             fi
         done
     else
@@ -1286,7 +1276,7 @@ sleep 7s
 #Scheme used:
 #https://wiki.archlinux.org/title/Dm-crypt/Encrypting_an_entire_system#LVM_on_LUKS
 
-if output=$([ "$IS_ENCRYPT" == "true" ] && [ "$IS_AUTO_PARTITIONING" == "true" ]); then
+if [ "$IS_ENCRYPT" == "true" ]; then
 
     clear
     prompt_info "Encrypting $ENCRYPT_PARTITION..."
@@ -1302,7 +1292,6 @@ if output=$([ "$IS_ENCRYPT" == "true" ] && [ "$IS_AUTO_PARTITIONING" == "true" ]
 
     prompt_info "Opening $ENCRYPT_PARTITION..."
     cryptsetup open "$ENCRYPT_PARTITION" cryptlvm
-    ENCRYPT_PARTITION="/dev/mapper/cryptlvm"
 
     #Prepare logical volumes
     clear
@@ -1408,7 +1397,7 @@ print_packages
 
 #Sort mirrorslist
 check_connection
-printf "${LIGHT_GREEN}Do you want to sort the mirror list to make the downloads faster?${LIGHT_RED} -It will persist in the installation but will take a while - ${LIGHT_GREEN}(y/n): ${NOCOLOUR}"
+printf "${LIGHT_GREEN}Do you want to sort the mirror list to make the downloads faster?${LIGHT_RED} -It will persist in the system but will take a while - ${LIGHT_GREEN}(y/n): ${NOCOLOUR}"
 yes_no
 if [ "$ANSWER" == "y" ]; then
 
@@ -1449,7 +1438,7 @@ function setup () {
     
     prompt_different "Please find your timezone in the list."
     echo
-    printf "${YELLOW}About to list timezones... ${LIGHT_RED}(Press q to quit and use / to search.)${NOCOLOUR}"
+    printf "${YELLOW}About to list timezones... ${LIGHT_RED}(Press 'q' to quit and use '/' to search.)${NOCOLOUR}"
     echo
     prompt_warning "Press any key to continue..."
     read -e -r TMP
@@ -1503,7 +1492,7 @@ function setup () {
     #Hosts
     prompt_info "Generating /etc/hosts..."
     {
-        printf "127.0.0.1      localhost\n"
+        printf "\n127.0.0.1      localhost\n"
         printf "::1            localhost\n"
         printf "127.0.1.1      %s.localdomain    %s" "$DEVICE" "$DEVICE"
     } >> /etc/hosts
@@ -1641,6 +1630,7 @@ export IS_ENCRYPT="$IS_ENCRYPT"
 export DISK="$DISK"
 export ENCRYPT_PARTITION="$ENCRYPT_PARTITION"
 export VOLGROUP="$VOLGROUP"
+export PROGRAM_NAME="$PROGRAM_NAME"
 export USER_NAME_TMP_FILE="$USER_NAME_TMP_FILE"
 
 export YELLOW="$YELLOW"
@@ -1663,10 +1653,10 @@ export -f setup
 arch-chroot "$MOUNT_PATH" /bin/bash -c "setup"
 
 #Setup second phase
-setup_second_phase
+setup-second-phase
 
 #Remove lock
 rm -f "/tmp/$PROGRAM_NAME.lock"
 
 #Finish
-prompt_warning "Please run ./setup_second_phase.sh command!"
+prompt_warning "Please run ./setup-second-phase.sh command!"
