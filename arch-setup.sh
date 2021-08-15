@@ -129,7 +129,7 @@ trap clean_up SIGHUP SIGINT SIGTERM
 
 function clean_up () {
 
-    rm -f "$USER_NAME_TMP_FILE"
+    rm -f "$MOUNT_PATH/$USER_NAME_TMP_FILE"
     rm -f "/tmp/$PROGRAM_NAME.lock"
     echo
     prompt_warning "Signal received..."
@@ -473,8 +473,8 @@ function setup-second-phase () {
 
 #Get user name that taken after first phase and delete that file
 declare USER_NAME=""
-USER_NAME=$(cat "$USER_NAME_TMP_FILE")
-rm "$USER_NAME_TMP_FILE"
+USER_NAME=$(cat "$MOUNT_PATH/$USER_NAME_TMP_FILE")
+rm -f "$MOUNT_PATH/$USER_NAME_TMP_FILE"
 
 #Inform the user (still in first phase)
 prompt_info "Generating setup-second-phase.sh..."
@@ -495,6 +495,7 @@ PROGRAM_NAME=\"setup-second-phase.sh\"
 #Colours for colourful output
 declare LIGHT_RED='\033[1;31m'
 declare YELLOW='\033[1;33m'
+declare LIGHT_GREEN='\033[1;32m'
 declare NOCOLOUR='\033[0m' #No Colour
 
 declare MOUNT_PATH=\"$MOUNT_PATH\"
@@ -508,6 +509,7 @@ declare SYSTEM_PARTITION=\"$SYSTEM_PARTITION\"
 declare USER_NAME=\"$USER_NAME\"
 declare AUR_PACKAGES=\"$AUR_PACKAGES\"
 declare SELECTED_GREETER=\"$SELECTED_GREETER\"
+declare SERVICES=\"$SERVICES\"
 
 
 # ---------------------------------------------------------------------------- #
@@ -722,6 +724,7 @@ export NOCOLOUR="$NOCOLOUR"
 export USER_NAME="$USER_NAME"
 export AUR_PACKAGES="$AUR_PACKAGES"
 export SELECTED_GREETER="$SELECTED_GREETER"
+export SERVICES="$SERVICES"
 '
 
 echo "#Export functions to be able to use in chroot
@@ -735,8 +738,8 @@ export -f aur
 #Run aur function
 arch-chroot \"\$MOUNT_PATH\" /bin/bash -c \"aur\" || Exit_ \$?
 
-prompt_warning \"ARCH SETUP FINISHED!!\"
-prompt_warning \"You can safely reboot now.\"
+printf \"\${LIGHT_GREEN}ARCH SETUP FINISHED!!\${NOCOLOUR}\"
+printf \"\${LIGHT_GREEN}You can safely reboot now.\${NOCOLOUR}\"
 
 Umount_
 
@@ -790,8 +793,11 @@ echo
 #Check the internet connection before attempting anything
 check_connection
 
-#Set time synchronization active
-timedatectl set-ntp true &>> /dev/null
+#Activate time synchronization
+prompt_info "Activating time synchronization..."
+{
+    timedatectl set-ntp true
+} &>> /dev/null
 
 #Get device name
 while true; do
@@ -1500,7 +1506,7 @@ function setup () {
     #Initramfs
     if [ "$IS_ENCRYPT" == "true" ]; then
     
-        prompt_info "Arranging /etc/mkinitcpio.conf"
+        prompt_info "Arranging /etc/mkinitcpio.conf..."
         declare MKINITCPIO=""
         MKINITCPIO=$(sed "s/HOOKS=(base udev autodetect modconf block filesystems keyboard fsck)/HOOKS=(base udev autodetect keyboard keymap consolefont modconf block encrypt lvm2 filesystems fsck)/g" /etc/mkinitcpio.conf)
         
@@ -1616,6 +1622,7 @@ function setup () {
     printf "${NOCOLOUR}"
 
     #Pass username to second phase
+    #We are in chroot, so the actual location in $MOUNT_PATH/$USER_NAME_TMP_FILE
     printf "%s" "$USER_NAME" > "$USER_NAME_TMP_FILE"
     
     prompt_warning "Installation complete!"
@@ -1659,4 +1666,4 @@ setup-second-phase
 rm -f "/tmp/$PROGRAM_NAME.lock"
 
 #Finish
-prompt_warning "Please run ./setup-second-phase.sh command!"
+prompt_different "Please run ./setup-second-phase.sh command!"
