@@ -39,9 +39,6 @@
 declare PROGRAM_NAME=""
 PROGRAM_NAME="arch-setup.sh"
 
-declare USER_NAME_TMP_FILE=""
-USER_NAME_TMP_FILE="/tmp/$PROGRAM_NAME.$$.$RANDOM"
-
 declare DISK_CHECK=""
 declare PART_CHECK=""
 declare NUMBER_CHECK=""
@@ -69,7 +66,6 @@ declare HOME_PARTITION=""
 declare SWAP_PARTITION=""
 
 
-#TODO: Paketler açıklanacak
 #All additional packages will be asked to the user.
 #They will be added to the original set if accepted.
 declare CORE_PACKAGES="base linux linux-firmware"
@@ -129,8 +125,6 @@ trap clean_up SIGHUP SIGINT SIGTERM
 
 function clean_up () {
 
-    rm -f "$MOUNT_PATH$USER_NAME_TMP_FILE"
-    rm -f "/tmp/$PROGRAM_NAME.lock"
     echo
     prompt_warning "Signal received..."
     prompt_warning "Exiting..."
@@ -180,72 +174,72 @@ function Umount_ () {
     declare LVM_U=""
     declare LUKS_U=""
     
-    MOUNTPOINTS_U=$(lsblk -o mountpoints "$DISK" | grep "/" | sort --reverse)
-    SWAPS_U=$(lsblk -o mountpoints,path "$DISK" | grep "\[SWAP\]" | awk '{print $2}')
-    CRYPT_U=$(lsblk -o type,path "$DISK")
-    LVM_U=$(echo "$CRYPT_U" | grep -w "lvm" | awk '{print $2}')
-    LUKS_U=$(echo "$CRYPT_U" | grep -w "crypt" | awk '{print $2}')
     
-    if output=$([ -n "$MOUNTPOINTS_U" ] && [ -n "$SWAPS_U" ] && [ -n "$CRYPT_U" ] && [ -n "$LVM_U" ] && [ -n "$LUKS_U" ]); then
+    prompt_info "Unmounting please wait..."
     
-        prompt_info "Unmounting please wait..."
+    #Umount
+    MOUNTPOINTS_U=$(lsblk -o mountpoints "$DISK" | grep "/" | sort --reverse) &> /dev/null
+    if [ -n "$MOUNTPOINTS_U" ]; then
     
-        #Umount
-        if [ -n "$MOUNTPOINTS_U" ]; then
+        for i in $MOUNTPOINTS_U; do
     
-            for i in $MOUNTPOINTS_U; do
+               umount "$i"
+        done
     
-                   umount "$i"
-            done
+        sleep 3s
+    fi
     
-            sleep 3s
-        fi
+    #Swapoff
+    SWAPS_U=$(lsblk -o mountpoints,path "$DISK" | grep "\[SWAP\]" | awk '{print $2}') &> /dev/null
+    if [ -n "$SWAPS_U" ]; then
     
-        #Swapoff
-        if [ -n "$SWAPS_U" ]; then
-    
-            for i in $SWAPS_U; do
+        for i in $SWAPS_U; do
                     
-                swapoff "$i"
-            done
+            swapoff "$i"
+        done
     
-            sleep 3s
-        fi
+        sleep 3s
+    fi
     
-        #Logical volumes
-        if [ -n "$LVM_U" ]; then
+    
+    CRYPT_U=$(lsblk -o type,path "$DISK") &> /dev/null
+    
+    #Logical volumes
+    LVM_U=$(echo "$CRYPT_U" | grep -w "lvm" | awk '{print $2}') &> /dev/null
+    if [ -n "$LVM_U" ]; then
         
-            for i in $LVM_U; do
+        for i in $LVM_U; do
             
-                cryptsetup close "$i"
-            done
+            cryptsetup close "$i"
+        done
     
-            sleep 3s
-        fi
+        sleep 3s
+    fi
     
-        #LUKS partitions
-        if [ -n "$LUKS_U" ]; then
+    #LUKS partitions
+    LUKS_U=$(echo "$CRYPT_U" | grep -w "crypt" | awk '{print $2}') &> /dev/null
+    if [ -n "$LUKS_U" ]; then
         
-            for i in $LUKS_U; do
+        for i in $LUKS_U; do
             
-                cryptsetup close "$i"
-            done
-    
-            sleep 3s
-        fi
+            cryptsetup close "$i"
+        done
+
+        sleep 3s
     fi
 
     #Inform the kernel
-    prompt_info "Informing kernel of partition changes..."
+    prompt_info "Informing kernel about partition changes..."
     partprobe
 }
 
 
 function Exit_ () {
 
-    Umount_
-
+    rm -f "$MOUNT_PATH$TMP_FILE"
     rm -f "/tmp/$PROGRAM_NAME.lock"
+
+    Umount_
 
     exit "$1"
 }
@@ -373,7 +367,7 @@ function number_check () {
     else
         
         IS_ARGUMENT="false"
-        read -e -r INPUT
+        read -e -r NUMBER_CHECK
     fi
     
     while output=$( [[ ! $NUMBER_CHECK =~ ^[0-9]+$ ]] || (( NUMBER_CHECK > max_ )) || (( NUMBER_CHECK == 0 )) ); do
@@ -392,8 +386,6 @@ function number_check () {
 
 
 function print_packages () {
-
-    #TODO: Paketlere link verilecek
 
     clear
     
@@ -427,24 +419,25 @@ function print_packages () {
     prompt_info "$AUR_PACKAGES"
     echo
     
-    printf "${LIGHT_RED}Greeter: ${LIGHT_CYAN}%s${NOCOLOUR}" "$SELECTED_GREETER"
+    printf "${LIGHT_GREEN}Greeter: ${LIGHT_CYAN}%s${NOCOLOUR}" "$SELECTED_GREETER"
     echo
     
-    printf "${LIGHT_RED}Video Driver: ${LIGHT_CYAN}%s${NOCOLOUR}" "$SELECTED_VIDEO_DRIVER"
+    printf "${LIGHT_GREEN}Video Driver: ${LIGHT_CYAN}%s${NOCOLOUR}" "$SELECTED_VIDEO_DRIVER"
+    echo
     echo
 }
 
 
-function pkg_select () {
 #Takes additional package sets as an argument
 #And asks the user to include each of the packages in the original set or not
+function pkg_select () {
 
     declare SELECTION_=""
     print_packages
 
     for i in $1; do
     
-        printf "${LIGHT_GREEN}Do you want to install ${LIGHT_RED}%s ${LIGHT_GREEN}as well? (y/n)${LIGHT_GREEN}: ${NOCOLOUR}" "$i"
+        printf "${LIGHT_GREEN}Do you want to install${LIGHT_RED} %s ${LIGHT_GREEN}? (y/n)${LIGHT_GREEN}: ${NOCOLOUR}" "$i"
         yes_no
         
         #Delete the previous line
@@ -529,11 +522,6 @@ function choose_one () {
 #Generate a file called "setup-second-phase.sh"
 #Warning: Mix use of double quotes ("") and single quotes ('')
 function setup-second-phase () {
-
-#Get user name that taken after first phase and delete that file
-declare USER_NAME=""
-USER_NAME=$(cat "$MOUNT_PATH$USER_NAME_TMP_FILE")
-rm -f "$MOUNT_PATH$USER_NAME_TMP_FILE"
 
 #Inform the user (still in first phase)
 prompt_info "Generating setup-second-phase.sh..."
@@ -856,10 +844,16 @@ export -f aur
 #Run aur function
 arch-chroot \"\$MOUNT_PATH\" /bin/bash -c \"aur\" || Exit_ \$?
 
-printf \"\${LIGHT_GREEN}ARCH SETUP FINISHED!!\${NOCOLOUR}\"
-printf \"\${LIGHT_GREEN}You can safely reboot now.\${NOCOLOUR}\"
+#Activate time synchronization
+prompt_info \"Activating time synchronization...\"
+timedatectl set-ntp true
 
 Umount_
+
+printf \"\${LIGHT_GREEN}ARCH SETUP FINISHED!!\${NOCOLOUR}\"
+echo
+printf \"\${LIGHT_GREEN}You can safely reboot now.\${NOCOLOUR}\"
+echo
 
 Exit_
 "
@@ -910,10 +904,6 @@ echo
 
 #Check the internet connection before attempting anything
 check_connection
-
-#Activate time synchronization
-prompt_info "Activating time synchronization..."
-timedatectl set-ntp true &> /dev/null
 
 #Get device name
 while true; do
@@ -1028,6 +1018,7 @@ if [ "$ANSWER" == "y" ]; then
         failure "If you still want to install, manually partition your device with MBR org GPT and don't use auto-partitioning."
     fi
 
+    #GPT or MBR?
     if output=$([ "$PARTITION_TABLE" != "gpt" ] && [ "$IS_UEFI" == "false" ]); then
     
         prompt_different "Two of the popular linux supported partition tables are GPT and MBR."
@@ -1394,7 +1385,7 @@ parted "$DISK" --script "print"
 sleep 7s
 
 
-# ---------------------------------- Encrypt --------------------------------- #
+# -------------------------------- Encrypting -------------------------------- #
 #Scheme used:
 #https://wiki.archlinux.org/title/Dm-crypt/Encrypting_an_entire_system#LVM_on_LUKS
 
@@ -1431,26 +1422,27 @@ fi
 
 
 # ------------------------------- File Systems ------------------------------- #
+
 prompt_info "Making file systems..."
 
 if output=$([ "$IS_UEFI" == "true" ] && [ "$IS_ESP_FORMAT" == "true" ]); then
 
-    mkfs.fat "$ESP" || failure "Cannot make file system in $ESP."
+    mkfs.fat "$ESP" || failure "Cannot make a file system in $ESP."
 fi
 
 if [ "$IS_SEPERATE" == "true" ]; then
 
-    mkfs.ext4 -F -F "$BOOT_PARTITION" || failure "Cannot make file system in $BOOT_PARTITION."
-    mkfs.ext4 -F -F "$SYSTEM_PARTITION" || failure "Cannot make file system in $SYSTEM_PARTITION."
-    mkfs.ext4 -F -F "$HOME_PARTITION" || failure "Cannot make file system in $HOME_PARTITION."
-    mkswap -f "$SWAP_PARTITION" || failure "Cannot make file system in $SWAP_PARTITION."
+    mkfs.ext4 -F -F "$BOOT_PARTITION" || failure "Cannot make a file system in $BOOT_PARTITION."
+    mkfs.ext4 -F -F "$SYSTEM_PARTITION" || failure "Cannot make a file system in $SYSTEM_PARTITION."
+    mkfs.ext4 -F -F "$HOME_PARTITION" || failure "Cannot make a file system in $HOME_PARTITION."
+    mkswap -f "$SWAP_PARTITION" || failure "Cannot make a file system in $SWAP_PARTITION."
     swapon "$SWAP_PARTITION" || failure "Cannot activate swap on $SWAP_PARTITION."
 
 elif [ "$IS_SEPERATE" == "false" ]; then
 
-    mkfs.ext4 -F -F "$BOOT_PARTITION" || failure "Cannot make file system in $BOOT_PARTITION."
-    mkfs.ext4 -F -F "$SYSTEM_PARTITION" || failure "Cannot make file system in $SYSTEM_PARTITION."
-    mkswap -f "$SWAP_PARTITION" || failure "Cannot make file system in $SWAP_PARTITION."
+    mkfs.ext4 -F -F "$BOOT_PARTITION" || failure "Cannot make a file system in $BOOT_PARTITION."
+    mkfs.ext4 -F -F "$SYSTEM_PARTITION" || failure "Cannot make a file system in $SYSTEM_PARTITION."
+    mkswap -f "$SWAP_PARTITION" || failure "Cannot make a file system in $SWAP_PARTITION."
     swapon "$SWAP_PARTITION" || failure "Cannot activate swap on $SWAP_PARTITION."
 else
 
@@ -1459,6 +1451,7 @@ fi
 
 
 # --------------------------------- Mounting --------------------------------- #
+
 prompt_info "Mounting..."
 
 #System
@@ -1488,7 +1481,7 @@ printf "${LIGHT_GREEN}Mounted on ${LIGHT_CYAN}%s${NOCOLOUR}" "$MOUNT_PATH"
 sleep 5s
 
 
-# ----------------------------- Package Selection ---------------------------- #
+#Package selection
 pkg_select "$ADDITIONAL_PACKAGES"
 PACKAGES+="$PKG_SELECT"
 
@@ -1498,14 +1491,13 @@ AUR_PACKAGES+="$PKG_SELECT"
 print_packages
 
 
-# ----------------------------- Greeter Selection ---------------------------- #
-#Print Greeters
+#Greeter selection
 choose_one "Greeter packages are: " "$GREETER" "$GREETER_AUR"
 SELECTED_GREETER="$SELECTION"
 
 print_packages
 
-# -------------------------- Video Driver Selection -------------------------- #
+#Video driver selction
 #Get model
 prompt_info "Your graphics card model is:"
 lspci -v | grep -A1 -e VGA -e 3D
@@ -1529,9 +1521,13 @@ if [ "$ANSWER" == "y" ]; then
 fi
 
 
-# ------------------------------- Installation ------------------------------- #
+# ---------------------------------------------------------------------------- #
+#                                 Installation                                 #
+# ---------------------------------------------------------------------------- #
+
 check_connection
 echo
+
 for i in {5..0}; do
 
     printf "${LIGHT_RED}Installation will start in: ${LIGHT_CYAN}%s${NOCOLOUR}\033[0K\r" "$i"
@@ -1550,7 +1546,7 @@ genfstab -U "$MOUNT_PATH" >> "$MOUNT_PATH/etc/fstab"
 # ---------------------------------------------------------------------------- #
 function setup () {
 
-    #Set timezone
+    #Timezone
     declare LIST=""
     declare TIMEZONE=""
     declare -i max=0
@@ -1561,6 +1557,10 @@ function setup () {
     function list_timezones {
     
         {
+
+            printf "${LIGHT_GREEN}Please find your timezone in the list. ${LIGHT_RED}(Press 'q' to quit and use '/' to search)${NOCOLOUR}"
+            echo
+
             declare -i n=0
             for i in $LIST; do
         
@@ -1570,13 +1570,6 @@ function setup () {
             done
         } | less --raw-control-chars
     }
-    
-    prompt_different "Please find your timezone in the list."
-    echo
-    printf "${YELLOW}About to list timezones... ${LIGHT_RED}(Press 'q' to quit and use '/' to search)${NOCOLOUR}"
-    echo
-    prompt_warning "Press any key to continue..."
-    read -e -r TMP
     
     list_timezones
     declare INPUT=""
@@ -1610,6 +1603,7 @@ function setup () {
     prompt_warning "Press any key to continue..."
     read -e -r TMP
     nano /etc/locale.gen
+    clear
     
     prompt_info "Generating locales..."
     locale-gen
@@ -1626,6 +1620,7 @@ function setup () {
         prompt_warning "Press any key to continue..."
         read -e -r TMP
         nano /etc/vconsole.conf
+        clear
     fi
 
     #Hostname
@@ -1640,10 +1635,10 @@ function setup () {
         printf "127.0.1.1      %s.localdomain    %s" "$DEVICE" "$DEVICE"
     } >> /etc/hosts
     
-    #Initramfs
+    # --------------------------------- Initramfs -------------------------------- #
+    
     if [ "$IS_ENCRYPT" == "true" ]; then
     
-        prompt_info "Arranging /etc/mkinitcpio.conf..."
         declare MKINITCPIO=""
         MKINITCPIO=$(sed "s/HOOKS=(base udev autodetect modconf block filesystems keyboard fsck)/HOOKS=(base udev autodetect keyboard keymap consolefont modconf block encrypt lvm2 filesystems fsck)/g" /etc/mkinitcpio.conf)
         
@@ -1653,6 +1648,8 @@ function setup () {
         
             prompt_info "Backing up /etc/mkinitcpio.conf to /etc/mkinitcpio.conf.backup..."
             mv /etc/mkinitcpio.conf /etc/mkinitcpio.conf.backup
+            
+            prompt_info "Configuring /etc/mkinitcpio.conf..."
             echo "$MKINITCPIO" > /etc/mkinitcpio.conf
         else
         
@@ -1669,17 +1666,18 @@ function setup () {
             read -e -r TMP
             
             nano /etc/mkinitcpio.conf
+            clear
         fi
     fi
     
-    #Grub
+    # -------------------------------- Boot Loader ------------------------------- #
+    
     prompt_info "Installing grub..."
     grub-install --target=i386-pc "$DISK"
     
     #Configure grub
     if [ "$IS_ENCRYPT" == "true" ]; then
     
-        prompt_info "Arranging /etc/default/grub..."
         declare ENCRYPT_UUID=""
         ENCRYPT_UUID=$(blkid "$ENCRYPT_PARTITION" | awk '{print $2}' | sed s/\"//g)
         
@@ -1692,6 +1690,8 @@ function setup () {
             
             prompt_info "Backing up /etc/default/grub to /etc/default/grub.backup..."
             mv /etc/default/grub /etc/default/grub.backup
+            
+            prompt_info "Configuring /etc/default/grub..."
             echo "$CMDLINE" > /etc/default/grub
         else
         
@@ -1706,6 +1706,7 @@ function setup () {
             read -e -r TMP
             
             nano /etc/default/grub
+            clear
         fi
     fi
     grub-mkconfig -o /boot/grub/grub.cfg
@@ -1732,50 +1733,67 @@ function setup () {
         read -e -r TMP
         
         nano /etc/sudoers
+        clear
     fi
     groupadd sudo
     
     #Add user
-    clear
-    prompt_question "Enter a name for new user: "
-    read -e -r USER_NAME
-    while ! useradd -m -G sudo "$USER_NAME"; do
-
-        prompt_warning "Try again."
+    declare USER_NAME=""
+    declare CHECK=""
+    while true; do
+    
+        prompt_question "Enter a name for new user: "
+        read -e -r USER_NAME
+        
+        prompt_question "Please re-enter: "
+        read -e -r CHECK
+        
+        if [ "$USER_NAME" == "$CHECK" ]; then
+        
+            useradd -m -G sudo "$USER_NAME" && break
+            prompt_warning "User name is not suitable!"
+        else
+    
+            echo
+            prompt_warning "Names don't match!"
+            echo
+        fi
     done
+
     while ! passwd "$USER_NAME"; do
 
         prompt_warning "Try again."
     done
     
-    #Setting root password
-    printf "${LIGHT_RED}Root "
+    echo
+    
+    #Set root password
+    printf "${LIGHT_RED}Root ${NOCOLOUR}"
     while ! passwd root; do
 
         prompt_warning "Try again."
-        printf "${LIGHT_RED}Root "
+        printf "${LIGHT_RED}Root ${NOCOLOUR}"
     done
 
-    printf "${NOCOLOUR}"
-
-    #Pass username to second phase
-    #We are in chroot, so the actual location is $MOUNT_PATH$USER_NAME_TMP_FILE
-    printf "%s" "$USER_NAME" > "$USER_NAME_TMP_FILE"
-    
     prompt_warning "Installation complete!"
+    
+    printf "%s" "$USER_NAME" > "$TMP_FILE"
 }
+
+#Script cannot make a tmp file in fricking /tmp directory (couldn't find an elegant solution)
+#The X's are replaced randomly
+declare TMP_FILE=""
+TMP_FILE="/bin/$(mktemp -u XXXXXXXXXXXX)"
 
 #Export variables to be able to use in chroot
 export NUMBER_CHECK="$NUMBER_CHECK"
 export ANSWER="$ANSWER"
 export DEVICE="$DEVICE"
-export MOUNT_PATH="$MOUNT_PATH"
 export IS_ENCRYPT="$IS_ENCRYPT"
 export DISK="$DISK"
 export ENCRYPT_PARTITION="$ENCRYPT_PARTITION"
 export VOLGROUP="$VOLGROUP"
-export PROGRAM_NAME="$PROGRAM_NAME"
-export USER_NAME_TMP_FILE="$USER_NAME_TMP_FILE"
+export TMP_FILE="$TMP_FILE"
 
 export YELLOW="$YELLOW"
 export PURPLE="$PURPLE"
@@ -1796,6 +1814,11 @@ export -f setup
 
 arch-chroot "$MOUNT_PATH" /bin/bash -c "setup"
 
+#Assign User_name
+declare USER_NAME=""
+USER_NAME=$(cat "$MOUNT_PATH$TMP_FILE")
+rm -f "$MOUNT_PATH$TMP_FILE"
+
 #Setup second phase
 setup-second-phase
 
@@ -1804,3 +1827,4 @@ rm -f "/tmp/$PROGRAM_NAME.lock"
 
 #Finish
 prompt_different "Please run ./setup-second-phase.sh command!"
+echo
