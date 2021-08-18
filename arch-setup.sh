@@ -24,10 +24,6 @@
 #This script is consists of two phases.
 #First phase includes: Partitioning - Installing system - Installing bootloader & official packages - Adding user account & Setting a root password
 #Second phase includes: Installing aur helper & aur packages - Enabling services
-#You can find second phase function in the ...th line
-
-#Table of Contents
-#
 
 
 #Followed guide:
@@ -47,6 +43,7 @@ declare ANSWER=""
 declare SELECTION=""
 
 declare MOUNT_PATH=""
+declare GRUB_ARGS=""
 
 declare PARTITION_TABLE=""
 declare DEVICE=""
@@ -109,7 +106,7 @@ declare LIGHT_GREEN='\033[1;32m'
 declare ORANGE='\033[0;33m'
 declare YELLOW='\033[1;33m'
 #declare BLUE='\033[0;34m'
-#declare LIGHT_BLUE='\033[1;34m'
+declare LIGHT_BLUE='\033[1;34m'
 declare PURPLE='\033[0;35m'
 #declare LIGHT_PURPLE='\033[1;35m'
 #declare CYAN='\033[0;36m'
@@ -126,9 +123,16 @@ trap clean_up SIGHUP SIGINT SIGTERM
 function clean_up () {
 
     echo
+    echo
     prompt_warning "Signal received..."
+    
+    rm -f "$MOUNT_PATH$TMP_FILE" &> /dev/null
+    rm -f "/tmp/$PROGRAM_NAME.lock"
+    
+    Umount_
+    
     prompt_warning "Exiting..."
-    Exit_ "130"
+    exit "130"
 }
 
 function check_connection () {
@@ -168,6 +172,8 @@ function prompt_path () {
 
 function Umount_ () {
 
+    if [ -z "$DISK" ]; then return; fi
+    
     declare MOUNTPOINTS_U=""
     declare SWAPS_U=""
     declare CRYPT_U=""
@@ -178,7 +184,7 @@ function Umount_ () {
     prompt_info "Unmounting please wait..."
     
     #Umount
-    MOUNTPOINTS_U=$(lsblk -o mountpoints "$DISK" | grep "/" | sort --reverse) &> /dev/null
+    MOUNTPOINTS_U=$(lsblk -o mountpoints "$DISK" | grep "/" | sort --reverse)
     if [ -n "$MOUNTPOINTS_U" ]; then
     
         for i in $MOUNTPOINTS_U; do
@@ -190,7 +196,7 @@ function Umount_ () {
     fi
     
     #Swapoff
-    SWAPS_U=$(lsblk -o mountpoints,path "$DISK" | grep "\[SWAP\]" | awk '{print $2}') &> /dev/null
+    SWAPS_U=$(lsblk -o mountpoints,path "$DISK" | grep "\[SWAP\]" | awk '{print $2}')
     if [ -n "$SWAPS_U" ]; then
     
         for i in $SWAPS_U; do
@@ -202,10 +208,10 @@ function Umount_ () {
     fi
     
     
-    CRYPT_U=$(lsblk -o type,path "$DISK") &> /dev/null
+    CRYPT_U=$(lsblk -o type,path "$DISK")
     
     #Logical volumes
-    LVM_U=$(echo "$CRYPT_U" | grep -w "lvm" | awk '{print $2}') &> /dev/null
+    LVM_U=$(echo "$CRYPT_U" | grep -w "lvm" | awk '{print $2}')
     if [ -n "$LVM_U" ]; then
         
         for i in $LVM_U; do
@@ -217,7 +223,7 @@ function Umount_ () {
     fi
     
     #LUKS partitions
-    LUKS_U=$(echo "$CRYPT_U" | grep -w "crypt" | awk '{print $2}') &> /dev/null
+    LUKS_U=$(echo "$CRYPT_U" | grep -w "crypt" | awk '{print $2}')
     if [ -n "$LUKS_U" ]; then
         
         for i in $LUKS_U; do
@@ -236,7 +242,7 @@ function Umount_ () {
 
 function Exit_ () {
 
-    rm -f "$MOUNT_PATH$TMP_FILE"
+    rm -f "$MOUNT_PATH$TMP_FILE" &> /dev/null
     rm -f "/tmp/$PROGRAM_NAME.lock"
 
     Umount_
@@ -363,7 +369,7 @@ function number_check () {
     if [ -n "$2" ]; then
     
         IS_ARGUMENT="true"
-        INPUT="$2"
+        NUMBER_CHECK="$2"
     else
         
         IS_ARGUMENT="false"
@@ -419,10 +425,10 @@ function print_packages () {
     prompt_info "$AUR_PACKAGES"
     echo
     
-    printf "${LIGHT_GREEN}Greeter: ${LIGHT_CYAN}%s${NOCOLOUR}" "$SELECTED_GREETER"
+    printf "${LIGHT_BLUE}Greeter: ${LIGHT_CYAN}%s${NOCOLOUR}" "$SELECTED_GREETER"
     echo
     
-    printf "${LIGHT_GREEN}Video Driver: ${LIGHT_CYAN}%s${NOCOLOUR}" "$SELECTED_VIDEO_DRIVER"
+    printf "${LIGHT_BLUE}Video Driver: ${LIGHT_CYAN}%s${NOCOLOUR}" "$SELECTED_VIDEO_DRIVER"
     echo
     echo
 }
@@ -777,12 +783,15 @@ echo "    #Check if /etc/lightdm.conf exists
         
             prompt_warning \"\$SELECTED_GREETER is not installed!\"
             prompt_warning \"Skipping activation.\"
-            prompt_warning \"You have to modify /etc/lightdm/lightdm.conf file manually after the installation.\"
+            prompt_warning \"You have to modify /etc/lightdm/lightdm.conf file manually after installing it.\"
             printf \"\${LIGHT_RED}greeter-session=example-gtk-gnome \${LIGHT_GREEN}should be equal to \${LIGHT_RED}greeter_session=\$SELECTED_GREETER \${LIGHT_GREEN}-which is under the [Seat:*] section-\${NOCOLOUR}\"
             
             prompt_warning \"Press any key to continue...\"
             read -e -r TMP
         fi
+        
+        prompt_warning \"For troubleshooting, follow this link: https://wiki.archlinux.org/title/LightDM#Troubleshooting\"
+        sleep 5s
     fi
 
     #Enabling services
@@ -886,10 +895,13 @@ fi
 
 #Disclaimer
 clear
-prompt_different "This script is for installing archlinux on an empty (or semi-empty) disk and assumes you already set your keyboard layout."
+prompt_different "This script is for installing archlinux on an empty (or semi-empty) disk and assumes you have ALREADY SET your keyboard layout."
 echo
 
-prompt_different "You can modify it to your needs, otherwise XFCE will be installed with a custom package set."
+prompt_different "You can modify this script to your needs, otherwise XFCE will be installed with a default package set."
+echo
+
+printf "${YELLOW}Keyboard Layout: ${PURPLE}https://wiki.archlinux.org/title/Installation_guide#Set_the_keyboard_layout${NOCOLOUR}"
 echo
 echo
 
@@ -937,15 +949,19 @@ DISK="$DISK_CHECK"
 
 Umount_
 
-#Check if system is UEFI
+# ---------------------------------- Is UEFI --------------------------------- #
+
 if [ -d /sys/firmware/efi/efivars ]; then
 
-    printf "${LIGHT_GREEN}System boot mode detected as ${LIGHT_CYAN}UEFI${NOCOLOUR}\n\n"
     IS_UEFI="true"
+    PACKAGES+=" efibootmgr"
+    GRUB_ARGS="--target=x86_64-efi --efi-directory=/efi --bootloader-id=Archlinux"
+    printf "${LIGHT_GREEN}System boot mode detected as ${LIGHT_CYAN}UEFI${NOCOLOUR}\n\n"
 else
 
-    printf "${LIGHT_GREEN}System boot mode detected as ${LIGHT_CYAN}Legacy BIOS${NOCOLOUR}\n\n"
     IS_UEFI="false"
+    GRUB_ARGS="--target=i386-pc $DISK"
+    printf "${LIGHT_GREEN}System boot mode detected as ${LIGHT_CYAN}Legacy BIOS${NOCOLOUR}\n\n"
 fi
 
 
@@ -1021,13 +1037,21 @@ if [ "$ANSWER" == "y" ]; then
     #GPT or MBR?
     if output=$([ "$PARTITION_TABLE" != "gpt" ] && [ "$IS_UEFI" == "false" ]); then
     
-        prompt_different "Two of the popular linux supported partition tables are GPT and MBR."
-        prompt_different "GUID Partition Table (GPT) is a replacement for legacy Master Boot Record (MBR) partition table."
-        prompt_different "It has better features and functionality."
+        clear
+        prompt_info "Two of the popular linux supported partition tables are GPT and MBR."
+
+        prompt_different "GUID Partition Table (GPT) is a replacement for legacy Master Boot Record (MBR) partition table. -It has better features and functionality-"
+        echo
         prompt_different "However, if you plan to install Windows or want it for some specific reason you can still use MBR."
-        prompt_different "For additional information visit this link - https://wiki.gentoo.org/wiki/Handbook:AMD64/Installation/Disks#Partition_tables -"
-        prompt_different "Note: Some elder hardware may have issues when booting from GPT."
-        prompt_question "Do you want to use MBR? (y/n): "
+        echo
+        echo
+        printf "${YELLOW}For additional information visit this link: ${PURPLE}https://wiki.gentoo.org/wiki/Handbook:AMD64/Installation/Disks#Partition_tables${NOCOLOUR}"
+        echo
+
+        echo
+        prompt_warning "Note: Some elder hardware may have issues when booting from GPT."
+        echo
+        prompt_question "Do you still want to use MBR? (y/n): "
         yes_no
         if [ "$ANSWER" == "y" ]; then
         
@@ -1257,7 +1281,8 @@ else #Manual partition selection
         declare -i current_=0
     
         prompt_warning "In this option, encrypted partitions will not be handled automatically."
-        prompt_warning "You need to follow one of the guides in: ${LIGHT_CYAN}https://wiki.archlinux.org/title/Dm-crypt/Encrypting_an_entire_system#Overview"
+        printf "${LIGHT_RED}You need to follow one of the guides in: ${LIGHT_CYAN}https://wiki.archlinux.org/title/Dm-crypt/Encrypting_an_entire_system#Overview${NOCOLOUR}"
+        echo
         prompt_info "LUKS partitions found!"
         printf "\033[1A"
         prompt_different "$LUKS"
@@ -1276,6 +1301,8 @@ else #Manual partition selection
                 prompt_info "Opening $i..."
                 cryptsetup open "$i" LUKS$current_ || failure "Error! try rebooting."
             fi
+
+            sleep 3s
         done
     else
     
@@ -1558,6 +1585,10 @@ function setup () {
     
         {
 
+            printf "${LIGHT_CYAN}Ctrl-C ${LIGHT_RED}will not work hereafter.${NOCOLOUR}"
+            echo
+            printf "${LIGHT_GREEN}If you're dual booting with Windows, follow this link: ${LIGHT_CYAN}https://wiki.archlinux.org/title/System_time#UTC_in_Microsoft_Windows${NOCOLOUR}"
+            echo
             printf "${LIGHT_GREEN}Please find your timezone in the list. ${LIGHT_RED}(Press 'q' to quit and use '/' to search)${NOCOLOUR}"
             echo
 
@@ -1673,7 +1704,7 @@ function setup () {
     # -------------------------------- Boot Loader ------------------------------- #
     
     prompt_info "Installing grub..."
-    grub-install --target=i386-pc "$DISK"
+    grub-install $GRUB_ARGS
     
     #Configure grub
     if [ "$IS_ENCRYPT" == "true" ]; then
@@ -1736,7 +1767,9 @@ function setup () {
         clear
     fi
     groupadd sudo
-    
+
+    clear
+
     #Add user
     declare USER_NAME=""
     declare CHECK=""
@@ -1780,7 +1813,7 @@ function setup () {
     printf "%s" "$USER_NAME" > "$TMP_FILE"
 }
 
-#Script cannot make a tmp file in fricking /tmp directory (couldn't find an elegant solution)
+#Script cannot make a tmp file in the freaking /tmp directory (couldn't find an elegant solution)
 #The X's are replaced randomly
 declare TMP_FILE=""
 TMP_FILE="/bin/$(mktemp -u XXXXXXXXXXXX)"
@@ -1793,6 +1826,7 @@ export IS_ENCRYPT="$IS_ENCRYPT"
 export DISK="$DISK"
 export ENCRYPT_PARTITION="$ENCRYPT_PARTITION"
 export VOLGROUP="$VOLGROUP"
+export GRUB_ARGS="$GRUB_ARGS"
 export TMP_FILE="$TMP_FILE"
 
 export YELLOW="$YELLOW"
