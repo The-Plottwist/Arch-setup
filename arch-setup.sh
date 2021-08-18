@@ -67,7 +67,7 @@ declare SWAP_PARTITION=""
 #They will be added to the original set if accepted.
 declare CORE_PACKAGES="base linux linux-firmware"
 
-declare PACKAGES="lvm2 sudo base-devel screen git python python-pip cpupower thermald dhcpcd dhclient flatpak parted htop lshw man-db man-pages texinfo mc nano net-tools network-manager-applet networkmanager nm-connection-editor ntfs-3g pacman-contrib unrar unzip p7zip usbutils wget xdg-user-dirs firefox deluge deluge-gtk foliate gimp inkscape keepassxc libreoffice-fresh vlc"
+declare PACKAGES="os-prober lvm2 sudo base-devel screen git python python-pip cpupower thermald dhcpcd dhclient flatpak parted htop lshw man-db man-pages texinfo mc nano net-tools network-manager-applet networkmanager nm-connection-editor ntfs-3g pacman-contrib unrar unzip p7zip usbutils wget xdg-user-dirs firefox deluge deluge-gtk foliate gimp inkscape keepassxc libreoffice-fresh vlc"
 
 declare ADDITIONAL_PACKAGES="virtualbox jre-openjdk vnstat xsane cups clamav moreutils gparted"
 
