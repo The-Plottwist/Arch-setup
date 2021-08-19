@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # -------------------------------- COPYRIGHT ------------------------------- #
-#    <Arch Linux installer>
+#    <A Complete Arch Linux Installer>
 #    
 #    Copyright (C) <2021> <Fatih Yegin>
 #    
@@ -443,7 +443,7 @@ function pkg_select () {
 
     for i in $1; do
     
-        printf "${LIGHT_GREEN}Do you want to install${LIGHT_RED} %s ${LIGHT_GREEN}? (y/n)${LIGHT_GREEN}: ${NOCOLOUR}" "$i"
+        printf "${LIGHT_GREEN}Do you want to install${LIGHT_RED} %s${LIGHT_GREEN}? (y/n)${LIGHT_GREEN}: ${NOCOLOUR}" "$i"
         yes_no
         
         #Delete the previous line
@@ -759,7 +759,7 @@ echo '    #Install aur packages
 echo "    #Check if /etc/lightdm.conf exists
     if [ -f \"/etc/lightdm/lightdm.conf\" ]; then
     
-        if pacman -Q | grep -q -w \"\$SELECTED_GREETER\"; then
+        if pacman -Q \"\$SELECTED_GREETER\"; then
         
             prompt_info \"Enabling \$SELECTED_GREETER...\"
             declare LIGHTDM_CONF=\"\"
@@ -776,7 +776,7 @@ echo "    #Check if /etc/lightdm.conf exists
                 prompt_warning \"You have to modify it manually.\"
                 printf \"\${LIGHT_RED}greeter-session=example-gtk-gnome \${LIGHT_GREEN}should be equal to \${LIGHT_RED}greeter_session=\$SELECTED_GREETER \${LIGHT_GREEN}-which is under the [Seat:*] section-\${NOCOLOUR}\"
                 
-                prompt_warning \"Press any key to continue...\"
+                prompt_warning \"Press enter to continue...\"
                 read -e -r TMP
             fi
         else
@@ -786,7 +786,7 @@ echo "    #Check if /etc/lightdm.conf exists
             prompt_warning \"You have to modify /etc/lightdm/lightdm.conf file manually after installing it.\"
             printf \"\${LIGHT_RED}greeter-session=example-gtk-gnome \${LIGHT_GREEN}should be equal to \${LIGHT_RED}greeter_session=\$SELECTED_GREETER \${LIGHT_GREEN}-which is under the [Seat:*] section-\${NOCOLOUR}\"
             
-            prompt_warning \"Press any key to continue...\"
+            prompt_warning \"Press enter to continue...\"
             read -e -r TMP
         fi
         
@@ -905,7 +905,7 @@ printf "${YELLOW}Keyboard Layout: ${PURPLE}https://wiki.archlinux.org/title/Inst
 echo
 echo
 
-printf "${ORANGE}If you encounter a problem or want to stop the command, you can always press Ctrl-C to quit.${NOCOLOUR}\n"
+printf "${ORANGE}If you encounter a problem or want to stop the command, you can press Ctrl-C to quit.${NOCOLOUR}\n"
 printf "${ORANGE}Use Ctrl-Z in dire situations and reboot your system afterwards as it doesn't actually stop the script.${NOCOLOUR}\n"
 echo
 
@@ -971,6 +971,7 @@ fi
 
 #Get disk size in MiB and subtract the extension
 DISK_SIZE_MIB=$(parted "$DISK" --script "u mib" \ "print" | grep "Disk $DISK:" | awk '{print $3}' | sed s/[A-Za-z]//g)
+
 #Convert it to TiB
 DISK_SIZE_TIB=$(( DISK_SIZE_MIB/(1024*1024) ))
 
@@ -991,8 +992,7 @@ fi
 #https://www.thomas-krenn.com/en/wiki/Partition_Alignment_detailed_explanation
 
 
-printf "${PURPLE}Your data will be ${LIGHT_RED}ERASED INDEPENDENTLY${PURPLE} of your answer!${NOCOLOUR}\n"
-prompt_question "Do you want to use auto partitioning? (y/n): "
+printf "${LIGHT_CYAN}Do you want to use auto partitioning? ${LIGHT_RED}-Everything will be ERASED- (y/n): ${NOCOLOUR}"
 yes_no
 if [ "$ANSWER" == "y" ]; then
 
@@ -1004,25 +1004,27 @@ if [ "$ANSWER" == "y" ]; then
     fi
 
     #Sizing                                             #Schemes used
+
     #BIOS Grub - 1mib
     #EFI System Partition [ESP] - 512mib                https://superuser.com/questions/1310927/what-is-the-absolute-minimum-size-a-uefi-system-partition-can-be/1310938#1310938
     #Boot - 500mib
     #Swap - 8gib                                        https://wiki.archlinux.org/title/Dm-crypt/Encrypting_an_entire_system#LVM_on_LUKS
     #System - 32gib (If seperate)
     #Home - All of the available space
-
+    
+    
     #Calculate needed size
     declare -i NEEDED_SIZE=0
     if output=$([ "$PARTITION_TABLE" == "gpt" ] && [ "$IS_UEFI" == "false" ]); then
     
-        NEEDED_SIZE+=1
+        NEEDED_SIZE+=1 #BIOS GRUB
     elif [ "$IS_UEFI" == "true" ]; then
     
-        NEEDED_SIZE+=512
+        NEEDED_SIZE+=512 #ESP
     fi
-    NEEDED_SIZE+=500
-    NEEDED_SIZE+=8192
-    NEEDED_SIZE+=32768
+    NEEDED_SIZE+=500 #BOOT
+    NEEDED_SIZE+=8192 #SWAP
+    NEEDED_SIZE+=32768 #SYSTEM
 
     #If not enough space
     if (( DISK_SIZE_MIB < NEEDED_SIZE )); then
@@ -1357,9 +1359,10 @@ else #Manual partition selection
             else
             
                 umount /mnt/is_esp
+                
                 prompt_warning "Not an EFI System partition!"
                 prompt_warning "Please re-enter!"
-                prompt_warning "You can always quit with Ctrl-C or Ctrl-Z if needed."
+                prompt_warning "You can quit with Ctrl-C or Ctrl-Z if needed."
                 sleep 2s
             fi
         done
@@ -1425,7 +1428,7 @@ if [ "$IS_ENCRYPT" == "true" ]; then
     while ! cryptsetup luksFormat "$ENCRYPT_PARTITION"; do
 
         prompt_warning "Try again."
-        prompt_warning "You can always quit with Ctrl-C or Ctrl-Z if needed."
+        prompt_warning "You can quit with Ctrl-C or Ctrl-Z if needed."
         sleep 3s
         clear
     done
@@ -1591,6 +1594,7 @@ function setup () {
             echo
             printf "${LIGHT_GREEN}Please find your timezone in the list. ${LIGHT_RED}(Press 'q' to quit and use '/' to search)${NOCOLOUR}"
             echo
+            echo
 
             declare -i n=0
             for i in $LIST; do
@@ -1631,7 +1635,7 @@ function setup () {
     #Locales
     printf "${LIGHT_GREEN}Please uncomment the needed locales ${LIGHT_RED}(en_US.UTF-8 UTF-8 and YOUR_LOCALE)${LIGHT_GREEN} in the file that is going to open.${NOCOLOUR}\n"
     printf "${LIGHT_GREEN}You can press ${LIGHT_RED}Ctrl-S${LIGHT_GREEN} to save and ${LIGHT_RED}Ctrl-X${LIGHT_GREEN} to exit.${NOCOLOUR}\n"
-    prompt_warning "Press any key to continue..."
+    prompt_warning "Press enter to continue..."
     read -e -r TMP
     nano /etc/locale.gen
     clear
@@ -1646,9 +1650,11 @@ function setup () {
     #Keymap
     if [ ! -f /etc/vconsole.conf ]; then
 
-        printf "${LIGHT_GREEN}Please write your keyboard layout in the file that is going to open. ${LIGHT_RED}(ex: KEYMAP=de-latin1)${NOCOLOUR}\n"
-        printf "${LIGHT_GREEN}You can press ${LIGHT_RED}Ctrl-S${LIGHT_GREEN} to save and ${LIGHT_RED}Ctrl-X${LIGHT_GREEN} to exit.${NOCOLOUR}\n"
-        prompt_warning "Press any key to continue..."
+        printf "${LIGHT_GREEN}Please write your keyboard layout in the file that is going to open. ${LIGHT_RED}(ex: KEYMAP=de-latin1)${NOCOLOUR}"
+        echo
+        printf "${LIGHT_GREEN}You can press ${LIGHT_RED}Ctrl-S${LIGHT_GREEN} to save and ${LIGHT_RED}Ctrl-X${LIGHT_GREEN} to exit.${NOCOLOUR}"
+        echo
+        prompt_warning "Press enter to continue..."
         read -e -r TMP
         nano /etc/vconsole.conf
         clear
@@ -1668,37 +1674,46 @@ function setup () {
     
     # --------------------------------- Initramfs -------------------------------- #
     
+    declare MKINITCPIO=""
     if [ "$IS_ENCRYPT" == "true" ]; then
     
-        declare MKINITCPIO=""
-        MKINITCPIO=$(sed "s/HOOKS=(base udev autodetect modconf block filesystems keyboard fsck)/HOOKS=(base udev autodetect keyboard keymap consolefont modconf block encrypt lvm2 filesystems fsck)/g" /etc/mkinitcpio.conf)
+        MKINITCPIO=$(sed "s/HOOKS=(base udev autodetect modconf block filesystems keyboard fsck)/HOOKS=(base udev autodetect keyboard keymap consolefont modconf block encrypt lvm2 filesystems resume fsck)/g" /etc/mkinitcpio.conf)
+    else
+    
+        MKINITCPIO=$(sed "s/HOOKS=(base udev autodetect modconf block filesystems keyboard fsck)/HOOKS=(base udev autodetect modconf block filesystems keyboard resume fsck)/g" /etc/mkinitcpio.conf)
+    fi
+    
+    #Flexibility for read/write operations
+    sleep 1s
+    
+    if [ -n "$MKINITCPIO" ]; then
+    
+        prompt_info "Backing up /etc/mkinitcpio.conf to /etc/mkinitcpio.conf.backup..."
+        mv /etc/mkinitcpio.conf /etc/mkinitcpio.conf.backup
         
-        sleep 1s
+        prompt_info "Configuring /etc/mkinitcpio.conf..."
+        echo "$MKINITCPIO" > /etc/mkinitcpio.conf
+    else
+    
+        prompt_warning "Cannot modify /etc/mkinitcpio.conf!"
+        prompt_warning "You have to modify it manually."
         
-        if [ -n "$MKINITCPIO" ]; then
-        
-            prompt_info "Backing up /etc/mkinitcpio.conf to /etc/mkinitcpio.conf.backup..."
-            mv /etc/mkinitcpio.conf /etc/mkinitcpio.conf.backup
-            
-            prompt_info "Configuring /etc/mkinitcpio.conf..."
-            echo "$MKINITCPIO" > /etc/mkinitcpio.conf
+        if [ "$IS_ENCRYPT" == "true" ]; then
+            echo "HOOKS=(base udev autodetect keyboard keymap consolefont modconf block encrypt lvm2 filesystems fsck)" >> /etc/mkinitcpio.conf
         else
         
-            prompt_warning "Cannot modify /etc/mkinitcpio.conf!"
-            prompt_warning "You have to modify it manually."
-            
-            echo "HOOKS=(base udev autodetect keyboard keymap consolefont modconf block encrypt lvm2 filesystems fsck)" >> /etc/mkinitcpio.conf
-            
-            prompt_different "Needed format appended to the file."
-            echo
-            prompt_different "Just comment the first 'HOOKS=...' line, and uncomment the second one."
-            echo
-            prompt_warning "Press any key to continue..."
-            read -e -r TMP
-            
-            nano /etc/mkinitcpio.conf
-            clear
+            echo "HOOKS=(base udev autodetect modconf block filesystems keyboard resume fsck)" >> /etc/mkinitcpio.conf
         fi
+        
+        prompt_different "Needed format appended to the file."
+        echo
+        prompt_different "Just add '#' to the begining of the first 'HOOKS=...' line."
+        echo
+        prompt_warning "Press enter to continue..."
+        read -e -r TMP
+        
+        nano /etc/mkinitcpio.conf
+        clear
     fi
     
     # -------------------------------- Boot Loader ------------------------------- #
@@ -1707,39 +1722,54 @@ function setup () {
     grub-install $GRUB_ARGS
     
     #Configure grub
+    declare CMDLINE=""
     if [ "$IS_ENCRYPT" == "true" ]; then
     
         declare ENCRYPT_UUID=""
         ENCRYPT_UUID=$(blkid "$ENCRYPT_PARTITION" | awk '{print $2}' | sed s/\"//g)
         
-        declare CMDLINE=""
-        CMDLINE=$(sed "s|GRUB_CMDLINE_LINUX=\"\"|GRUB_CMDLINE_LINUX=\"cryptdevice=$ENCRYPT_UUID:cryptlvm root=/dev/$VOLGROUP/root\"|g" /etc/default/grub)
+        CMDLINE=$(sed "s|GRUB_CMDLINE_LINUX=\"\"|GRUB_CMDLINE_LINUX=\"cryptdevice=$ENCRYPT_UUID:cryptlvm root=/dev/$VOLGROUP/root resume=/dev/$VOLGROUP/swap\"|g" /etc/default/grub)
+    else
         
-        sleep 1s
+        #For hibernation
+        declare SWAP_UUID=""
+        SWAP_UUID=$(blkid "$SWAP_PARTITION" | awk '{print $2}' | sed s/\"//g)
         
-        if [ -n "$CMDLINE" ]; then
+        CMDLINE=$(sed "s|GRUB_CMDLINE_LINUX=\"\"|GRUB_CMDLINE_LINUX=\"resume=$SWAP_UUID\"|g" /etc/default/grub)
+    fi
+    
+    #Flexibility for read/write operations
+    sleep 1s
+    
+    if [ -n "$CMDLINE" ]; then
             
-            prompt_info "Backing up /etc/default/grub to /etc/default/grub.backup..."
-            mv /etc/default/grub /etc/default/grub.backup
+        prompt_info "Backing up /etc/default/grub to /etc/default/grub.backup..."
+        mv /etc/default/grub /etc/default/grub.backup
+        
+        prompt_info "Configuring /etc/default/grub..."
+        echo "$CMDLINE" > /etc/default/grub
+    else
+    
+        prompt_warning "Cannot modify /etc/default/grub!"
+        prompt_warning "You have to modify it manually."
+        
+        if [ "$IS_ENCRYPT" == "true" ]; then
             
-            prompt_info "Configuring /etc/default/grub..."
-            echo "$CMDLINE" > /etc/default/grub
+            echo "GRUB_CMDLINE_LINUX=\"cryptdevice=$ENCRYPT_UUID:cryptlvm root=/dev/$VOLGROUP/root resume=/dev/$VOLGROUP/swap\"" >> /etc/default/grub
         else
         
-            prompt_warning "Cannot modify /etc/default/grub!"
-            prompt_warning "You have to modify it manually."
-            
-            echo "GRUB_CMDLINE_LINUX=\"cryptdevice=$ENCRYPT_UUID:cryptlvm root=/dev/$VOLGROUP/root\"" >> /etc/default/grub
-            
-            prompt_different "Needed format appended to the file.\n"
-            printf "${LIGHT_GREEN}Just comment the first ${LIGHT_RED}'GRUB_CMDLINE_LINUX=...'${LIGHT_GREEN} line, and uncomment the second one.${NOCOLOUR}\n"
-            prompt_warning "Press any key to continue..."
-            read -e -r TMP
-            
-            nano /etc/default/grub
-            clear
+            echo "GRUB_CMDLINE_LINUX=\"resume=$SWAP_UUID\"" >> /etc/default/grub
         fi
+        
+        prompt_different "Needed format appended to the file.\n"
+        printf "${LIGHT_GREEN}Just add '#' to the beginning of the first ${LIGHT_RED}'GRUB_CMDLINE_LINUX='${LIGHT_GREEN} line.${NOCOLOUR}\n"
+        prompt_warning "Press enter to continue..."
+        read -e -r TMP
+        
+        nano /etc/default/grub
+        clear
     fi
+    prompt_info "Generating grub.cfg..."
     grub-mkconfig -o /boot/grub/grub.cfg
     
     #Enable sudo group
@@ -1759,8 +1789,8 @@ function setup () {
         prompt_warning "Cannot modify /etc/sudoers!"
         prompt_warning "You have to modify it manually."
         
-        echo "${LIGHT_GREEN}Just uncomment the ${LIGHT_RED}'# %sudo...'${LIGHT_GREEN} line.${NOCOLOUR}"
-        prompt_warning "Press any key to continue..."
+        echo "${LIGHT_GREEN}Just delete the '#' ${LIGHT_RED}'# %sudo...'${LIGHT_GREEN} line.${NOCOLOUR}"
+        prompt_warning "Press enter to continue..."
         read -e -r TMP
         
         nano /etc/sudoers
@@ -1825,6 +1855,7 @@ export DEVICE="$DEVICE"
 export IS_ENCRYPT="$IS_ENCRYPT"
 export DISK="$DISK"
 export ENCRYPT_PARTITION="$ENCRYPT_PARTITION"
+export SWAP_PARTITION="$SWAP_PARTITION"
 export VOLGROUP="$VOLGROUP"
 export GRUB_ARGS="$GRUB_ARGS"
 export TMP_FILE="$TMP_FILE"
