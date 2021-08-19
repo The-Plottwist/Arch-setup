@@ -790,8 +790,8 @@ echo "    #Check if /etc/lightdm.conf exists
             read -e -r TMP
         fi
         
-        printf \"${LIGHT_RED}For troubleshooting about lightdm, follow this link: ${LIGHT_CYAN}https://wiki.archlinux.org/title/LightDM#Troubleshooting${NOCOLOUR}\"
-        sleep 5s
+        printf \"${LIGHT_RED}For troubleshooting about lightdm, follow this link: ${PURPLE}https://wiki.archlinux.org/title/LightDM#Troubleshooting${NOCOLOUR}\"
+        sleep 10s
     fi
 
     #Enabling services
@@ -1071,7 +1071,7 @@ if [ "$ANSWER" == "y" ]; then
         prompt_different "However, if you plan to install Windows or want it for some specific reason you can still use MBR."
         echo
         echo
-        printf "${YELLOW}For additional information visit this link: ${LIGHT_CYAN}https://wiki.gentoo.org/wiki/Handbook:AMD64/Installation/Disks#Partition_tables${NOCOLOUR}"
+        printf "${YELLOW}For additional information visit this link: ${PURPLE}https://wiki.gentoo.org/wiki/Handbook:AMD64/Installation/Disks#Partition_tables${NOCOLOUR}"
         echo
 
         echo
@@ -1614,7 +1614,7 @@ function setup () {
 
             printf "${LIGHT_CYAN}Ctrl-C ${LIGHT_RED}will not work hereafter.${NOCOLOUR}"
             echo
-            printf "${LIGHT_GREEN}If you're dual booting with Windows, follow this link: ${LIGHT_CYAN}https://wiki.archlinux.org/title/System_time#UTC_in_Microsoft_Windows${NOCOLOUR}"
+            printf "${LIGHT_GREEN}If you're dual booting with Windows, follow this link: ${PURPLE}https://wiki.archlinux.org/title/System_time#UTC_in_Microsoft_Windows${NOCOLOUR}"
             echo
             printf "${LIGHT_GREEN}Please find your timezone in the list. ${LIGHT_RED}(Press 'q' to quit and use '/' to search)${NOCOLOUR}"
             echo
@@ -1796,8 +1796,8 @@ function setup () {
     prompt_info "Generating grub.cfg..."
     grub-mkconfig -o /boot/grub/grub.cfg
     
-    printf "${LIGHT_RED}For troubleshooting about suspend/hibernate, follow this link: ${LIGHT_CYAN}https://wiki.archlinux.org/title/Power_management/Suspend_and_hibernate#Troubleshooting${NOCOLOUR}"
-    sleep 5s
+    printf "${LIGHT_RED}For troubleshooting about suspend/hibernate, follow this link: ${PURPLE}https://wiki.archlinux.org/title/Power_management/Suspend_and_hibernate#Troubleshooting${NOCOLOUR}"
+    sleep 10s
     
     #Enable sudo group
     prompt_info "Enabling sudo group..."
