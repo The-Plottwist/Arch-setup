@@ -893,24 +893,30 @@ else
     touch "/tmp/$PROGRAM_NAME.lock"
 fi
 
-#ASCII art 
+#ASCII art
 #http://patorjk.com/software/taag/#p=display&f=ANSI%20Shadow&t=Arch%20Setup
 clear
 echo
 echo
 echo
-prompt_question '
+prompt_question "
                █████╗ ██████╗  ██████╗██╗  ██╗    ███████╗███████╗████████╗██╗   ██╗██████╗ 
               ██╔══██╗██╔══██╗██╔════╝██║  ██║    ██╔════╝██╔════╝╚══██╔══╝██║   ██║██╔══██╗
               ███████║██████╔╝██║     ███████║    ███████╗█████╗     ██║   ██║   ██║██████╔╝
               ██╔══██║██╔══██╗██║     ██╔══██║    ╚════██║██╔══╝     ██║   ██║   ██║██╔═══╝ 
               ██║  ██║██║  ██║╚██████╗██║  ██║    ███████║███████╗   ██║   ╚██████╔╝██║     
               ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝    ╚══════╝╚══════╝   ╚═╝    ╚═════╝ ╚═╝     
-'
-echo
-echo
-echo
-echo
+"
+#http://patorjk.com/software/taag/#p=display&f=Kban&t=by%20The-Plottwist
+prompt_info "
+'||                  |''||''| '||              ' '||''|.  '||            .     .                ||           .   
+ || ...  .... ...       ||     || ..     ....     ||   ||  ||    ...   .||.  .||.  ... ... ... ...   ....  .||.  
+ ||'  ||  '|.  |        ||     ||' ||  .|...||    ||...|'  ||  .|  '|.  ||    ||    ||  ||  |   ||  ||. '   ||   
+ ||    |   '|.|         ||     ||  ||  ||         ||       ||  ||   ||  ||    ||     ||| |||    ||  . '|..  ||   
+ '|...'     '|         .||.   .||. ||.  '|...'   .||.     .||.  '|..|'  '|.'  '|.'    |   |    .||. |'..|'  '|.' 
+         .. |                                                                                                    
+          ''                                                                                                     
+"
 
 #Disclaimer
 prompt_different "This script is for installing archlinux on an empty (or semi-empty) disk and assumes you have ALREADY SET your keyboard layout."
