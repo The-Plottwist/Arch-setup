@@ -790,7 +790,7 @@ echo "    #Check if /etc/lightdm.conf exists
             read -e -r TMP
         fi
         
-        prompt_warning \"For troubleshooting about lightdm, follow this link: https://wiki.archlinux.org/title/LightDM#Troubleshooting\"
+        printf \"${LIGHT_RED}For troubleshooting about lightdm, follow this link: ${LIGHT_CYAN}https://wiki.archlinux.org/title/LightDM#Troubleshooting${NOCOLOUR}\"
         sleep 5s
     fi
 
@@ -1071,7 +1071,7 @@ if [ "$ANSWER" == "y" ]; then
         prompt_different "However, if you plan to install Windows or want it for some specific reason you can still use MBR."
         echo
         echo
-        printf "${YELLOW}For additional information visit this link: ${PURPLE}https://wiki.gentoo.org/wiki/Handbook:AMD64/Installation/Disks#Partition_tables${NOCOLOUR}"
+        printf "${YELLOW}For additional information visit this link: ${LIGHT_CYAN}https://wiki.gentoo.org/wiki/Handbook:AMD64/Installation/Disks#Partition_tables${NOCOLOUR}"
         echo
 
         echo
@@ -1796,7 +1796,7 @@ function setup () {
     prompt_info "Generating grub.cfg..."
     grub-mkconfig -o /boot/grub/grub.cfg
     
-    prompt_warning "For troubleshooting about suspend/hibernate, follow this link: https://wiki.archlinux.org/title/Power_management/Suspend_and_hibernate#Troubleshooting"
+    printf "${LIGHT_RED}For troubleshooting about suspend/hibernate, follow this link: ${LIGHT_CYAN}https://wiki.archlinux.org/title/Power_management/Suspend_and_hibernate#Troubleshooting${NOCOLOUR}"
     sleep 5s
     
     #Enable sudo group
