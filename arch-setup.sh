@@ -790,7 +790,7 @@ echo "    #Check if /etc/lightdm.conf exists
             read -e -r TMP
         fi
         
-        prompt_warning \"For troubleshooting, follow this link: https://wiki.archlinux.org/title/LightDM#Troubleshooting\"
+        prompt_warning \"For troubleshooting about lightdm, follow this link: https://wiki.archlinux.org/title/LightDM#Troubleshooting\"
         sleep 5s
     fi
 
@@ -879,6 +879,8 @@ chmod +x setup-second-phase.sh
 #                                  First Phase                                 #
 # ---------------------------------------------------------------------------- #
 
+#This script assumes keyboard layout has already been set
+
 #Lock file
 if [ -f "/tmp/$PROGRAM_NAME.lock" ]; then
 
@@ -891,10 +893,26 @@ else
     touch "/tmp/$PROGRAM_NAME.lock"
 fi
 
-#Assumes keyboard layout has already been set
+#ASCII art 
+#http://patorjk.com/software/taag/#p=display&f=ANSI%20Shadow&t=Arch%20Setup
+clear
+echo
+echo
+echo
+prompt_question '
+               █████╗ ██████╗  ██████╗██╗  ██╗    ███████╗███████╗████████╗██╗   ██╗██████╗ 
+              ██╔══██╗██╔══██╗██╔════╝██║  ██║    ██╔════╝██╔════╝╚══██╔══╝██║   ██║██╔══██╗
+              ███████║██████╔╝██║     ███████║    ███████╗█████╗     ██║   ██║   ██║██████╔╝
+              ██╔══██║██╔══██╗██║     ██╔══██║    ╚════██║██╔══╝     ██║   ██║   ██║██╔═══╝ 
+              ██║  ██║██║  ██║╚██████╗██║  ██║    ███████║███████╗   ██║   ╚██████╔╝██║     
+              ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝    ╚══════╝╚══════╝   ╚═╝    ╚═════╝ ╚═╝     
+'
+echo
+echo
+echo
+echo
 
 #Disclaimer
-clear
 prompt_different "This script is for installing archlinux on an empty (or semi-empty) disk and assumes you have ALREADY SET your keyboard layout."
 echo
 
@@ -1338,11 +1356,11 @@ else #Manual partition selection
 
     #Get ESP
     if [ "$IS_UEFI" == "true" ]; then
-        
-        #Make is_esp directory and don't prompt for error if exist
-        mkdir -p /mnt/is_esp
     
         IS_ESP_FORMAT="false"
+    
+        #Make is_esp directory and don't prompt for error if exist
+        mkdir -p /mnt/is_esp
     
         while true; do
             
@@ -1457,7 +1475,7 @@ prompt_info "Making file systems..."
 
 if output=$([ "$IS_UEFI" == "true" ] && [ "$IS_ESP_FORMAT" == "true" ]); then
 
-    mkfs.fat "$ESP" || failure "Cannot make a file system in $ESP."
+    mkfs.fat -F32 "$ESP" || failure "Cannot make a file system in $ESP."
 fi
 
 if [ "$IS_SEPERATE" == "true" ]; then
@@ -1489,7 +1507,7 @@ mkdir -p "$MOUNT_PATH"
 mount "$SYSTEM_PARTITION" "$MOUNT_PATH"
 
 #ESP
-#https://wiki.archlinux.org/title/EFI_system_partition#Mount_the_partition
+#https://wiki.archlinux.org/title/EFI_system_partition#Mount_the_partition -Third option-
 if [ "$IS_UEFI" == "true" ]; then
 
     mkdir -p "$MOUNT_PATH/efi"
@@ -1771,6 +1789,9 @@ function setup () {
     fi
     prompt_info "Generating grub.cfg..."
     grub-mkconfig -o /boot/grub/grub.cfg
+    
+    prompt_warning "For troubleshooting about suspend/hibernate, follow this link: https://wiki.archlinux.org/title/Power_management/Suspend_and_hibernate#Troubleshooting"
+    sleep 5s
     
     #Enable sudo group
     prompt_info "Enabling sudo group..."
