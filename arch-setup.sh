@@ -1053,7 +1053,7 @@ if [ "$ANSWER" == "y" ]; then
     #Sizing                                             #Schemes used
 
     #BIOS Grub - 1mib
-    #EFI System Partition [ESP] - 512mib                https://superuser.com/questions/1310927/what-is-the-absolute-minimum-size-a-uefi-system-partition-can-be/1310938#1310938
+    #EFI System Partition [ESP] - 512mib                https://wiki.archlinux.org/title/EFI_system_partition#Create_the_partition
     #Boot - 500mib
     #Swap - 8gib                                        https://wiki.archlinux.org/title/Dm-crypt/Encrypting_an_entire_system#LVM_on_LUKS
     #System - 32gib (If seperate)
