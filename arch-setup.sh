@@ -554,18 +554,13 @@ declare NOCOLOUR='\033[0m' #No Colour
 declare MOUNT_PATH=\"$MOUNT_PATH\"
 declare DISK=\"$DISK\"
 
-declare IS_ENCRYPT=\"$IS_ENCRYPT\"
-declare ENCRYPT_PARTITION=\"$ENCRYPT_PARTITION\"
-declare SWAP_PARTITION=\"$SWAP_PARTITION\"
-declare HOME_PARTITION=\"$HOME_PARTITION\"
-declare SYSTEM_PARTITION=\"$SYSTEM_PARTITION\"
-
 declare USER_NAME=\"$USER_NAME\"
 declare AUR_PACKAGES=\"$AUR_PACKAGES\"
 declare SELECTED_GREETER=\"$SELECTED_GREETER\"
 declare SERVICES=\"$SERVICES\"
+"
 
-
+echo '
 # ---------------------------------------------------------------------------- #
 #                                   Functions                                  #
 # ---------------------------------------------------------------------------- #
@@ -575,18 +570,17 @@ trap clean_up SIGHUP SIGINT SIGTERM
 
 function clean_up () {
 
-    prompt_warning \"Signal received!\"
-    prompt_warning \"Exiting...\"
-    Exit_ \"155\"
+    prompt_warning "Signal received!"
+    prompt_warning "Exiting..."
+    Exit_ "155"
 }
 
 function check_connection () {
 
-    { ping wiki.archlinux.org -c 1 &>> /dev/null; } || failure \"No internet connection!\"
+    { ping wiki.archlinux.org -c 1 &>> /dev/null; } || failure "No internet connection!"
 }
-"
 
-echo 'function Umount_ () {
+function Umount_ () {
 
     declare MOUNTPOINTS_U=""
     declare SWAPS_U=""
@@ -650,12 +644,11 @@ echo 'function Umount_ () {
     fi
 
     #Inform the kernel
-    prompt_info "Informing kernel of partition changes..."
+    prompt_info "Informing kernel about partition changes..."
     partprobe
 }
-'
 
-echo 'function Exit_ () {
+function Exit_ () {
 
     #Umount_
 
@@ -683,143 +676,153 @@ function failure () {
     prompt_warning "Exiting..."
     Exit_ 1
 }
-'
 
-echo "#The aur function (will be called in chroot)
+#The aur function (will be called in chroot)
 function aur () {
 
-    #Make a github directory and clone yay (will be called in user's terminal)
+    #Make a github directory and clone yay (will be called in user'\''s terminal)
     function clone_yay () {
 
         #Generating home directories
-        prompt_info \"Generating home directories...\"
+        prompt_info "Generating home directories..."
         xdg-user-dirs-update
 
         check_connection
 
-        prompt_info \"Cloning yay...\"
-        cd \"/home/\$USER_NAME\" || failure \"Cannot change directory to /home/\$USER_NAME\"
-        mkdir -p Git-Hub || failure \"/home/\$USER_NAME/Git-Hub directory couldn't made.\"
-        cd Git-Hub || failure \"Cannot change directory to /home/\$USER_NAME/Git-Hub\"
+        prompt_info "Cloning yay..."
+        cd "/home/$USER_NAME" || failure "Cannot change directory to /home/$USER_NAME"
+        mkdir -p Git-Hub || failure "/home/$USER_NAME/Git-Hub directory couldn'\''t made."
+        cd Git-Hub || failure "Cannot change directory to /home/$USER_NAME/Git-Hub"
 
-        git clone https://aur.archlinux.org/yay.git || failure \"Cannot clone yay.\"
+        if [ ! -d yay ]; then
+        
+            git clone https://aur.archlinux.org/yay.git || failure "Cannot clone yay."
+        fi
     }
 
     #Generating home directories
-    prompt_info \"Generating home directories...\"
+    prompt_info "Generating home directories..."
     xdg-user-dirs-update
     
     #Install go for yay
-    prompt_info \"Installing go for aur helper... -yay-\"
+    prompt_info "Installing go for aur helper... -yay-"
     pacman -S --noconfirm go
     
-    #Export variables to use it in the user's shell
-    export USER_NAME=\"\$USER_NAME\"
+    #Export variables to use it in the user'\''s shell
+    export USER_NAME="$USER_NAME"
     
-    #Export functions to call it in the user's shell
+    #Export functions to call it in the user'\''s shell
     export -f clone_yay
     export -f check_connection
 
     #Clone yay
-    su \"\$USER_NAME\" /bin/bash -c clone_yay || Exit_ \$?
+    su "$USER_NAME" /bin/bash -c clone_yay || Exit_ $?
 
     #Install yay.
-    prompt_info \"Installing yay...\"
-    cd \"/home/\$USER_NAME/Git-Hub/yay\" || failure \"Cannot change directory to /home/\$USER_NAME/Git-Hub/yay\"
-    sudo -u \"\$USER_NAME\" makepkg -si --noconfirm || failure \"Error Cannot install yay!\"
+    prompt_info "Installing yay..."
+    cd "/home/$USER_NAME/Git-Hub/yay" || failure "Cannot change directory to /home/$USER_NAME/Git-Hub/yay"
+    sudo -u "$USER_NAME" makepkg -si --noconfirm || failure "Error Cannot install yay!"
     
     #Download pkgbuilds
-    prompt_info \"Downloading pkgbuilds...\"
-    mkdir -p \"/home/\$USER_NAME/.cache/yay\" || { prompt_warning \"Cannot make /home/\$USER_NAME/.cache/yay directory!\"; prompt_warning \"Instead, downloading to /home/\$USER_NAME\"; }
-    
-    if [ -d \"/home/\$USER_NAME/.cache/yay\" ]; then
-        
-        cd \"/home/\$USER_NAME/.cache/yay\" || failure \"Cannot change directory to /home/\$USER_NAME/.cache/yay\"
-    else
-        
-        cd \"/home/\$USER_NAME/\" || failure \"Cannot change directory to /home/\$USER_NAME/\"
-    fi
-    yay --getpkgbuild \$AUR_PACKAGES || failure \"Cannot download pkgbuilds!\"
+    prompt_info "Downloading pkgbuilds..."
+    mkdir -p "/home/$USER_NAME/.cache/yay" || failure "Cannot make /home/$USER_NAME/.cache/yay directory!"
+    cd "/home/$USER_NAME/.cache/yay" || failure "Cannot change directory to /home/$USER_NAME/.cache/yay"
+    yay --getpkgbuild $AUR_PACKAGES || failure "Cannot download pkgbuilds!"
 
     #Arrange permissions
-    chown -R \"\$USER_NAME:\$USER_NAME\" \"/home/\$USER_NAME/.cache/\"
-"
-
-echo '    #Install aur packages
+    chown -R "$USER_NAME:$USER_NAME" "/home/$USER_NAME/.cache/"
+    
+    #Install aur packages
     prompt_info "Installing aur packages..."
-    cd "/home/$USER_NAME/.cache/yay"
+    cd "/home/$USER_NAME/.cache/yay" || failure "Cannot change directory to /home/$USER_NAME/.cache/yay"
     for i in *; do
 
         cd "$i"
         sudo -u "$USER_NAME" makepkg -si --noconfirm
         cd ..
     done
-'
-
-echo "    #Check if /etc/lightdm.conf exists
-    if [ -f \"/etc/lightdm/lightdm.conf\" ]; then
     
-        if pacman -Q \"\$SELECTED_GREETER\"; then
+    # ------------------------------- Login Manager ------------------------------ #
+    #Check if /etc/lightdm.conf exists
+    if [ -f "/etc/lightdm/lightdm.conf" ]; then
+    
+        # -------------------------------- Background -------------------------------- #
         
-            prompt_info \"Enabling \$SELECTED_GREETER...\"
-            declare LIGHTDM_CONF=\"\"
-            LIGHTDM_CONF=\$(sed \"s/#greeter-session=example-gtk-gnome/greeter-session=\$SELECTED_GREETER/g\" /etc/lightdm/lightdm.conf)
-            sleep 1s
-            if [ -n \"\$LIGHTDM_CONF\" ]; then
+        prompt_info "Arranging login screen background..."
+        if output=$([ -f "/usr/share/backgrounds/Login_screen.png" ] && [ "$SELECTED_GREETER" == "lightdm-slick-greeter" ]); then
+        
+            {
+                echo "[Greeter]"
+                echo "draw-user-backgrounds=false"
+                echo "draw-grid=false"
+                echo "enable-hidpi=auto"
+                echo "background=/usr/share/backgrounds/Login_screen.png"
+                echo "theme-name=Adwaita-dark"
+                echo "icon-theme-name=Adwaita"
+            } > /etc/lightdm/slick-greeter.conf
+        fi
             
-                prompt_info \"Backing up /etc/lightdm/lightdm.conf to /etc/lightdm/lightdm.conf.backup...\"
+        if pacman -Q "$SELECTED_GREETER"; then
+        
+            declare LIGHTDM_CONF=""
+            LIGHTDM_CONF=$(sed "s/#greeter-session=example-gtk-gnome/greeter-session=$SELECTED_GREETER/g" /etc/lightdm/lightdm.conf)
+            
+            sleep 1s
+            
+            prompt_info "Activating $SELECTED_GREETER..."
+            if [ -n "$LIGHTDM_CONF" ]; then
+            
+                prompt_info "Backing up /etc/lightdm/lightdm.conf to /etc/lightdm/lightdm.conf.backup..."
                 mv /etc/lightdm/lightdm.conf /etc/lightdm/lightdm.conf.backup
-                echo \"\$LIGHTDM_CONF\" > /etc/lightdm/lightdm.conf
+                echo "$LIGHTDM_CONF" > /etc/lightdm/lightdm.conf
             else
             
-                prompt_warning \"Cannot modify /etc/lightdm/lightdm.conf file.\"
-                prompt_warning \"You have to modify it manually.\"
-                printf \"\${LIGHT_RED}greeter-session=example-gtk-gnome \${LIGHT_GREEN}should be equal to \${LIGHT_RED}greeter_session=\$SELECTED_GREETER \${LIGHT_GREEN}-which is under the [Seat:*] section-\${NOCOLOUR}\"
+                prompt_warning "Cannot modify /etc/lightdm/lightdm.conf file."
+                prompt_warning "You have to modify it manually."
+                printf "${LIGHT_RED}greeter-session=example-gtk-gnome ${LIGHT_GREEN}should be equal to ${LIGHT_RED}greeter_session=$SELECTED_GREETER ${LIGHT_GREEN}-which is under the [Seat:*] section-${NOCOLOUR}"
                 
-                prompt_warning \"Press enter to continue...\"
+                prompt_warning "Press enter to continue..."
                 read -e -r TMP
             fi
         else
         
-            prompt_warning \"\$SELECTED_GREETER is not installed!\"
-            prompt_warning \"Skipping activation.\"
-            prompt_warning \"You have to modify /etc/lightdm/lightdm.conf file manually after installing it.\"
-            printf \"\${LIGHT_RED}greeter-session=example-gtk-gnome \${LIGHT_GREEN}should be equal to \${LIGHT_RED}greeter_session=\$SELECTED_GREETER \${LIGHT_GREEN}-which is under the [Seat:*] section-\${NOCOLOUR}\"
+            prompt_warning "Warning! $SELECTED_GREETER is not installed!"
+            prompt_warning "Skipping activation."
+            prompt_warning "You have to modify /etc/lightdm/lightdm.conf file manually after installing it."
+            printf "${LIGHT_RED}greeter-session=example-gtk-gnome ${LIGHT_GREEN}should be equal to ${LIGHT_RED}greeter_session=$SELECTED_GREETER ${LIGHT_GREEN}-which is under the [Seat:*] section-${NOCOLOUR}"
             
-            prompt_warning \"Press enter to continue...\"
+            prompt_warning "Press enter to continue..."
             read -e -r TMP
         fi
         
-        printf \"${LIGHT_RED}For troubleshooting about lightdm, follow this link: ${PURPLE}https://wiki.archlinux.org/title/LightDM#Troubleshooting${NOCOLOUR}\"
-        sleep 10s
+        printf "${LIGHT_RED}For troubleshooting about lightdm, follow this link: ${PURPLE}https://wiki.archlinux.org/title/LightDM#Troubleshooting${NOCOLOUR}\n\n"
+        for i in {10..1}; do
+
+            printf "${LIGHT_GREEN}Continuing in ${LIGHT_CYAN}$i\033[0K\r${NOCOLOUR}"
+            sleep 1s
+        done
     fi
 
     #Enabling services
-    prompt_info \"Enabling services...\"
-    for i in \$SERVICES; do
+    prompt_info "Enabling services..."
+    for i in $SERVICES; do
         
-        systemctl enable \$i || { prompt_warning \"Cannot enable \$i service!\"; echo \"\"; echo \"\$i\" >> /\$HOME/disabled_services.txt; prompt_warning \"Service added to /\$HOME/disabled_services.txt, Please enable it manually.\"; }
+        systemctl enable $i || { prompt_warning "Cannot enable $i service!"; echo ""; echo "$i" >> "$HOME/disabled_services.txt"; prompt_warning "Service added to $HOME/disabled_services.txt, Please enable it manually."; }
     done
 
     #Generate initramfs
-    prompt_info \"Generating initramfs...\"
+    prompt_info "Generating initramfs..."
     mkinitcpio -P
-    
-    #Return home
-    cd \"/home/\$USER_NAME\"
 
-    prompt_warning \"AUR configuration complete!\"
+    prompt_warning "AUR configuration complete!"
 }
-"
 
-echo '
+
 # ---------------------------------------------------------------------------- #
 #                           Second Phase Starts Here                           #
 # ---------------------------------------------------------------------------- #
 
-'
-
-echo '#Lock file
+#Lock file
 if [ -f "/tmp/$PROGRAM_NAME.lock" ]; then
 
     prompt_warning "Another instance is already running!"
@@ -831,18 +834,31 @@ else
     touch "/tmp/$PROGRAM_NAME.lock"
 fi
 
+#Copy background images
+prompt_info "Copying background images..."
+if [ -f "Login_screen.png" ]; then
+
+    cp Login_screen.png $MOUNT_PATH/usr/share/backgrounds
+fi
+
+#Changing xfce'\''s default background with mine :)
+if output=$([ -f "Background.png" ] && [ -d "$MOUNT_PATH/usr/share/backgrounds/xfce" ]); then
+
+    cp Background.png $MOUNT_PATH/usr/share/backgrounds/xfce/xfce-verticals.png
+fi
+
 #Exporting variables to be able to use in chroot
 export LIGHT_RED="$LIGHT_RED"
 export YELLOW="$YELLOW"
+export LIGHT_GREEN="$LIGHT_GREEN"
 export NOCOLOUR="$NOCOLOUR"
 
 export USER_NAME="$USER_NAME"
 export AUR_PACKAGES="$AUR_PACKAGES"
 export SELECTED_GREETER="$SELECTED_GREETER"
 export SERVICES="$SERVICES"
-'
 
-echo "#Export functions to be able to use in chroot
+#Export functions to be able to use in chroot
 export -f prompt_info
 export -f prompt_warning
 export -f check_connection
@@ -851,21 +867,22 @@ export -f Exit_
 export -f aur
 
 #Run aur function
-arch-chroot \"\$MOUNT_PATH\" /bin/bash -c \"aur\" || Exit_ \$?
+arch-chroot "$MOUNT_PATH" /bin/bash -c "aur" || Exit_ $?
 
 #Activate time synchronization
-prompt_info \"Activating time synchronization...\"
+prompt_info "Activating time synchronization..."
 timedatectl set-ntp true
 
 Umount_
 
-printf \"\${LIGHT_GREEN}ARCH SETUP FINISHED!!\${NOCOLOUR}\"
 echo
-printf \"\${LIGHT_GREEN}You can safely reboot now.\${NOCOLOUR}\"
+printf "${LIGHT_GREEN}ARCH SETUP FINISHED!!${NOCOLOUR}"
+echo
+printf "${LIGHT_GREEN}You can safely reboot now.${NOCOLOUR}"
 echo
 
 Exit_
-"
+'
 
 } > setup-second-phase.sh
 
@@ -909,13 +926,13 @@ prompt_question "
 "
 #http://patorjk.com/software/taag/#p=display&f=Kban&t=by%20The-Plottwist
 prompt_info "
-'||                  |''||''| '||              ' '||''|.  '||            .     .                ||           .   
- || ...  .... ...       ||     || ..     ....     ||   ||  ||    ...   .||.  .||.  ... ... ... ...   ....  .||.  
- ||'  ||  '|.  |        ||     ||' ||  .|...||    ||...|'  ||  .|  '|.  ||    ||    ||  ||  |   ||  ||. '   ||   
- ||    |   '|.|         ||     ||  ||  ||         ||       ||  ||   ||  ||    ||     ||| |||    ||  . '|..  ||   
- '|...'     '|         .||.   .||. ||.  '|...'   .||.     .||.  '|..|'  '|.'  '|.'    |   |    .||. |'..|'  '|.' 
-         .. |                                                                                                    
-          ''                                                                                                     
+'||                  |''||''| '||              ' '||''|.  '||            .     .                ||           .  
+ || ...  .... ...       ||     || ..     ....     ||   ||  ||    ...   .||.  .||.  ... ... ... ...   ....  .||. 
+ ||'  ||  '|.  |        ||     ||' ||  .|...||    ||...|'  ||  .|  '|.  ||    ||    ||  ||  |   ||  ||. '   ||  
+ ||    |   '|.|         ||     ||  ||  ||         ||       ||  ||   ||  ||    ||     ||| |||    ||  . '|..  ||  
+ '|...'     '|         .||.   .||. ||.  '|...'   .||.     .||.  '|..|'  '|.'  '|.'    |   |    .||. |'..|'  '|.'
+         .. |                                                                                                   
+          ''                                                                                                    
 "
 
 #Disclaimer
@@ -1018,6 +1035,12 @@ fi
 
 printf "${LIGHT_CYAN}Do you want to use auto partitioning? ${LIGHT_RED}-Everything will be ERASED- (y/n): ${NOCOLOUR}"
 yes_no
+if [ "$ANSWER" == "y" ]; then
+
+    prompt_question "Are you sure? (y/n): "
+    yes_no
+fi
+
 if [ "$ANSWER" == "y" ]; then
 
 
@@ -1796,8 +1819,12 @@ function setup () {
     prompt_info "Generating grub.cfg..."
     grub-mkconfig -o /boot/grub/grub.cfg
     
-    printf "${LIGHT_RED}For troubleshooting about suspend/hibernate, follow this link: ${PURPLE}https://wiki.archlinux.org/title/Power_management/Suspend_and_hibernate#Troubleshooting${NOCOLOUR}"
-    sleep 10s
+    printf "${LIGHT_RED}For troubleshooting about suspend/hibernate, follow this link: ${PURPLE}https://wiki.archlinux.org/title/Power_management/Suspend_and_hibernate#Troubleshooting${NOCOLOUR}\n\n"
+    for i in {10..1}; do
+
+        printf "${LIGHT_GREEN}Continuing in ${LIGHT_CYAN}$i\033[0K\r${NOCOLOUR}"
+        sleep 1s
+    done
     
     #Enable sudo group
     prompt_info "Enabling sudo group..."
