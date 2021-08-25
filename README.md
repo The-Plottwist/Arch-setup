@@ -2,8 +2,6 @@
 
 A single file and fully customizable installer script for archlinux.
 
-## Purpose
-
 Archlinux is a distro that it gives full control to anyone who wants to install this distro. With their comprehensive [wiki page](https://wiki.archlinux.org/), one can find satisfying answers to his/her questions and can follow various guides to achieve his/her customized installation. By writing this script, I wanted to retain this customizability while on the other hand automating my installation process.
 
 ## Features
@@ -12,7 +10,7 @@ Archlinux is a distro that it gives full control to anyone who wants to install 
 
 - Auto partitioning
 
-- Auto encrypting with cryptsetup ([LUKS](https://wiki.archlinux.org/title/Dm-crypt/Encrypting_an_entire_system#LVM_on_LUKS))
+- Auto encrypting with cryptsetup ([LVM on LUKS](https://wiki.archlinux.org/title/Dm-crypt/Encrypting_an_entire_system#LVM_on_LUKS))
 
 - Installing a [set of packages](#Link_to_packages) (both aur and official)
 
@@ -32,19 +30,9 @@ Also sets a default background for the desktop and login manager.
 
 Visit the [how it works guide](#Link_to_how_it_works) and the rest is up to you.
 
-## Why bash script?
+## Why a bash script?
 
-*There are a couple reasons:*
-
-- A large proportion of the linux users familiar with bash
-
-- It doesn't need to compile
-
-- It doesn't need any libraries
-
-- Commonly used commands
-
-- Alteration is easy due to above reasons
+A large proportion of the linux users are already familiar with bash. Thus, making a modification is straightforward.
 
 ## Followed Guides
 
