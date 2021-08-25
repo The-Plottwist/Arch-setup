@@ -4,24 +4,54 @@ A single file and fully customizable installer script for archlinux.
 
 ## Purpose
 
-Archlinux is a distro that it gives full control to anyone who wants to install this distro. With their comprehensive [wiki page](https://wiki.archlinux.org/), one can find satisfying answers to his/her questions and can follow various guides to achieve his/her customized installation. By writing this script, I wanted to retain this customizability while on the other hand automating my installation proccess.
+Archlinux is a distro that it gives full control to anyone who wants to install this distro. With their comprehensive [wiki page](https://wiki.archlinux.org/), one can find satisfying answers to his/her questions and can follow various guides to achieve his/her customized installation. By writing this script, I wanted to retain this customizability while on the other hand automating my installation process.
 
-## Goals
+## Features
 
-- Being fully transparent
+*It provides a complete system installation which can be boiled down to:*
 
-- Ease of customization
+- Auto partitioning
 
-- Explanation of each sections (of the code)
+- Auto encrypting with cryptsetup ([LUKS](https://wiki.archlinux.org/title/Dm-crypt/Encrypting_an_entire_system#LVM_on_LUKS))
 
-## Pros
+- Installing a [set of packages](#Link_to_packages) (both aur and official)
 
-- Follows the [archlinux installation guide]([Installation guide - ArchWiki](https://wiki.archlinux.org/title/Installation_guide)).
+- Installing an aur helper
 
-- Automatically installs a Desktop Environment
+- Installing a bootloader
 
-- Automatically installs an Aur helper (which is yay)
+- Installing a login manager & greeter
 
-- Automatically installs a set of packages (both aur and official)
+- Adding a user account
 
-- And most importantly, you have the opportunity to browse and edit the code directly. With this way, you can tailor it the way you want.
+Also sets a default background for the desktop and login manager.
+
+## Usage
+
+## How to alter the code?
+
+Visit the [how it works guide](#Link_to_how_it_works) and the rest is up to you.
+
+## Why bash script?
+
+*There are a couple reasons:*
+
+- A large proportion of the linux users familiar with bash
+
+- It doesn't need to compile
+
+- It doesn't need any libraries
+
+- Commonly used commands
+
+- Alteration is easy due to above reasons
+
+## Followed Guides
+
+- <https://wiki.archlinux.org/title/Installation_guide>
+
+- <https://wiki.archlinux.org/title/EFI_system_partition#Create_the_partition>
+
+- <https://wiki.archlinux.org/title/EFI_system_partition#Mount_the_partition> (Option three)
+
+- <https://wiki.archlinux.org/title/Dm-crypt/Encrypting_an_entire_system#LVM_on_LUKS>
