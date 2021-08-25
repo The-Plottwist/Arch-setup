@@ -67,14 +67,14 @@ declare SWAP_PARTITION=""
 #They will be added to the original set if accepted.
 declare CORE_PACKAGES="base linux linux-firmware"
 
-declare PACKAGES="os-prober lvm2 sudo base-devel screen git python python-pip cpupower thermald dhcpcd dhclient flatpak parted htop lshw man-db man-pages texinfo mc nano net-tools network-manager-applet networkmanager nm-connection-editor ntfs-3g pacman-contrib unrar unzip p7zip usbutils wget xdg-user-dirs firefox deluge deluge-gtk foliate gimp inkscape keepassxc libreoffice-fresh vlc"
+declare PACKAGES="os-prober lvm2 sudo base-devel screen git python python-pip cpupower thermald dhcpcd dhclient flatpak parted htop lshw man-db man-pages texinfo mc nano net-tools network-manager-applet networkmanager nm-connection-editor ntfs-3g pacman-contrib unrar unzip p7zip usbutils wget xdg-user-dirs firefox deluge deluge-gtk foliate gimp inkscape keepassxc libreoffice-fresh vlc cups"
 
-declare ADDITIONAL_PACKAGES="virtualbox jre-openjdk vnstat xsane cups clamav moreutils gparted"
+declare ADDITIONAL_PACKAGES="virtualbox jre-openjdk vnstat clamav moreutils gparted"
 
 declare BOOTLOADER_PACKAGES="grub intel-ucode amd-ucode"
 
 declare DE_PACKAGES="xorg xorg-server xfce4 xfce4-goodies"
-declare DE_DEPENDENT_PACKAGES="eom evolution evolution-on file-roller atril gvfs gvfs-mtp gufw pavucontrol pulseaudio seahorse"
+declare DE_DEPENDENT_PACKAGES="xsane system-config-printer eom evolution evolution-on file-roller atril gvfs gvfs-mtp gufw pavucontrol pulseaudio seahorse"
 
 declare AUR_PACKAGES="lightdm-settings cpupower-gui-git nano-syntax-highlighting"
 declare ADDITIONAL_AUR_PACKAGES="ttf-ms-fonts"
@@ -396,6 +396,11 @@ function print_packages () {
     clear
     
     prompt_warning "Current selected packages are:"
+    echo
+    
+    echo
+    printf "${LIGHT_GREEN} For printer drivers follow this link: ${PURPLE}https://wiki.archlinux.org/title/CUPS/Printer-specific_problems#Epson"
+    echo
     
     printf "${PURPLE}Core Packages: ${NOCOLOUR}"
     prompt_info "$CORE_PACKAGES"
