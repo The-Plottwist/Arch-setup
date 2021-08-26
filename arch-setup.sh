@@ -462,6 +462,13 @@ function pkg_select () {
             
                 SERVICES+=" clamav-freshclam"
             fi
+            
+            if [ "$i" == "virtualbox" ]; then
+            
+                #If you are installing a custom kernel or linux-lts, comment the first one and uncomment the other
+                SERVICES+=" virtualbox-host-modules-arch"
+                #SERVICES+=" virtualbox-host-dkms"
+            fi
         fi
     done
     
