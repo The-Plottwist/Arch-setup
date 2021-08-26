@@ -275,9 +275,10 @@ function yes_no () {
     if [ "$ANSWER" == "N" ]; then ANSWER="n"; fi
 }
 
-#If no arguments passed, read it from the user.
-#And check the input. If user entered wrongly
-#loop until correct answer is get else return either 0 -true- or 12 -false-
+#If no arguments passed read it from the user
+#and check the input. If user entered wrongly
+#loop until correct answer has gotten.
+#Else, check the given argument and return a value (if correct 0 - if false 12)
 function disk_check () {
 
     declare INPUT=""
@@ -312,9 +313,10 @@ function disk_check () {
 }
 
 
-#If no arguments passed, read it from the user.
-#And check the input. If user entered wrongly
-#loop until correct answer is get else return either 0 -true- or 13 -false-
+#If no arguments passed read it from the user
+#and check the input. If user entered wrongly
+#loop until correct answer has gotten.
+#Else, check the given argument and return a value (if correct 0 - if false 13)
 function partition_check () {
 
     declare INPUT=""
@@ -348,9 +350,10 @@ function partition_check () {
 }
 
 
-#If no arguments passed, read it from the user.
-#And check the input. If user entered wrongly
-#loop until correct answer is get else return either 0 -true- or 14 -false-
+#If no arguments passed read it from the user
+#and check the input. If user entered wrongly
+#loop until correct answer has gotten.
+#Else, check the given argument and return a value (if correct 0 - if false 14)
 function number_check () {
 
     declare max_=0
