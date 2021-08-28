@@ -501,6 +501,7 @@ function pkg_find () {
                 if [ "$i" == "$j" ]; then
                 
                     PKG_FIND+=" $j"
+                    find=( "${find[@]/$i}" ) #Omit the founded package, thus optimize the search.
                 fi
             done
         done
