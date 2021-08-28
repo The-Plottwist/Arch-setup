@@ -14,6 +14,8 @@ Archlinux is a distro that it gives full control to anyone who wants to install 
 
 - Installing a [set of packages](#Link_to_packages) (both aur and official)
 
+- Performing package specific operations
+
 - Installing an aur helper
 
 - Installing a bootloader
@@ -26,13 +28,21 @@ Also sets a default background for the desktop and login manager.
 
 ## Usage
 
+After booting into iso:
+
+- Clone the repo with `git clone https://github.com/The-Plottwist/Arch-setup`
+
+- Change your directory to `Arch-setup` (This is necessary for background images)
+
+- Run the script with `./arch-setup.sh`
+
 ## How to alter the code?
 
 Visit the [how it works guide](#Link_to_how_it_works) and the rest is up to you.
 
 ## Why a bash script?
 
-A large proportion of the linux users are already familiar with bash. Thus, making a modification is straightforward.
+A large proportion of the linux users are already familiar with bash and it doesn't need to compile.
 
 ## Followed Guides
 
