@@ -22,8 +22,8 @@
 
 #Important note:
 #This script is consists of two phases.
-#First phase includes: Partitioning - Installing system - Installing bootloader & official packages - Adding user account & Setting a root password
-#Second phase includes: Installing aur helper & aur packages - Enabling services
+#First phase includes: Partitioning - Installing system - Installing bootloader & official packages - Adding user account & Setting a root password etc.
+#Second phase includes: Installing aur helper & aur packages - Enabling services etc.
 
 
 #Followed guide:
