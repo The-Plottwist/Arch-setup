@@ -12,7 +12,7 @@ Archlinux is a distro that it gives full control to anyone who wants to install 
 
 - Auto encrypting with cryptsetup ([LVM on LUKS](https://wiki.archlinux.org/title/Dm-crypt/Encrypting_an_entire_system#LVM_on_LUKS))
 
-- Installing a [set of packages](#Link_to_packages) (both aur and official)
+- Installing a set of packages (both aur and official)
 
 - Performing package specific operations
 
@@ -28,7 +28,9 @@ Also sets a default background for the desktop and login manager.
 
 ## Usage
 
-After booting into iso:
+After booting into the iso:
+
+- Set your [keyboard layout](https://wiki.archlinux.org/title/Installation_guide#Set_the_keyboard_layout)
 
 - Clone the repo with `git clone https://github.com/The-Plottwist/Arch-setup`
 
@@ -36,9 +38,11 @@ After booting into iso:
 
 - Run the script with `./arch-setup.sh`
 
-## How to alter the code?
+***A proper internet connection is needed!***
 
-Visit the [how it works guide](#Link_to_how_it_works) and the rest is up to you.
+If you have a wired connection, just type `dhcpcd` and `ping archlinux.org -c 1`
+
+Otherwise follow this guide: <https://www.linuxandubuntu.com/home/how-to-setup-a-wifi-in-arch-linux-using-terminal>
 
 ## Why a bash script?
 
