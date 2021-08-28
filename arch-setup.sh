@@ -39,6 +39,7 @@ declare DISK_CHECK=""
 declare PART_CHECK=""
 declare NUMBER_CHECK=""
 declare PKG_SELECT=""
+declare PKG_FIND=""
 declare ANSWER=""
 declare SELECTION=""
 
@@ -398,11 +399,10 @@ function print_packages () {
 
     clear
     
-    prompt_warning "Current selected packages are:"
     echo
+    printf "${LIGHT_GREEN}For printer drivers follow this link: ${PURPLE}https://wiki.archlinux.org/title/CUPS/Printer-specific_problems#Epson"
     
-    echo
-    printf "${LIGHT_GREEN} For printer drivers follow this link: ${PURPLE}https://wiki.archlinux.org/title/CUPS/Printer-specific_problems#Epson"
+    prompt_warning "Current selected packages are:"
     echo
     
     printf "${PURPLE}Core Packages: ${NOCOLOUR}"
@@ -442,8 +442,8 @@ function print_packages () {
 }
 
 
-#Takes additional package sets as an argument
-#And asks the user to include each of the packages in the original set or not
+#Takes an additional package set as an argument
+#and asks each of them to include it in the original set or not
 function pkg_select () {
 
     declare SELECTION_=""
@@ -460,18 +460,6 @@ function pkg_select () {
         if [ "$ANSWER" == "y" ]; then
         
             SELECTION_+=" $i"
-            
-            if [ "$i" == "clamav" ]; then
-            
-                SERVICES+=" clamav-freshclam"
-            fi
-            
-            if [ "$i" == "virtualbox" ]; then
-            
-                #If you are installing a custom kernel or linux-lts, comment the first one and uncomment the other
-                SERVICES+=" virtualbox-host-modules-arch"
-                #SERVICES+=" virtualbox-host-dkms"
-            fi
         fi
     done
     
@@ -479,7 +467,111 @@ function pkg_select () {
 }
 
 
-function choose_one () {
+function pkg_find () {
+
+    declare find=("$@")
+
+    #Check if the given package is alredy found
+    for i in $PKG_FIND; do
+    
+        for j in "${find[@]}"; do
+        
+            #Omit
+            if [ "$j" == "$i" ]; then
+            
+                find=( "${find[@]/$i}" )
+            fi
+        done
+    done
+    
+    #Make values unique
+    #https://stackoverflow.com/questions/13648410/how-can-i-get-unique-values-from-an-array-in-bash
+    #https://github.com/koalaman/shellcheck/wiki/SC2207
+    IFS=" " read -r -a find <<< "$(tr ' ' '\n' <<< "${find[@]}" | sort -u | tr '\n' ' ')"
+    
+    #Check if array is not empty
+    if [ "${#find[@]}" != "0" ]; then
+    
+        #Search for the given package
+        for i in $CORE_PACKAGES $PACKAGES $BOOTLOADER_PACKAGES $DISPLAY_MANAGER $DE_PACKAGES $DE_DEPENDENT_PACKAGES $AUR_PACKAGES $SELECTED_GREETER $SELECTED_VIDEO_DRIVER; do
+        
+            for j in "${find[@]}"; do
+            
+                #Add to the PKG_FIND
+                if [ "$i" == "$j" ]; then
+                
+                    PKG_FIND+=" $j"
+                fi
+            done
+        done
+    fi
+}
+
+#A space must be put before adding it to the package set
+#i.e. syntax should be: foo+=" bar"
+function pkg_specific_operations () {
+
+    pkg_find "$@"
+    
+    for i in $PKG_FIND; do
+    
+        for j in "$@"; do
+        
+            if [ "$j" == "$i" ]; then
+            
+                case $j in
+                
+                    #https://wiki.archlinux.org/title/VirtualBox#Installation_steps_for_Arch_Linux_hosts
+                    virtualbox)
+                    
+                        declare is_default_kernel=""
+                        declare is_lts=""
+                        
+                        #Find which kernel is in use
+                        pkg_find "linux" "linux-lts"
+                        for it in $PKG_FIND; do
+                        
+                            if [ "$it" == "linux" ]; then
+                            
+                                is_default_kernel="true"
+                                break
+                            elif [ "$it" == "linux-lts" ]; then
+                            
+                                is_lts="true"
+                                break
+                            fi
+                        done
+                        
+                        
+                        #Add the needed packages to queue
+                        if [ "$is_default_kernel" == "true" ]; then
+                        
+                            PACKAGES+=" virtualbox-host-modules-arch"
+                        else
+                        
+                            PACKAGES+=" virtualbox-host-dkms"
+                        fi
+                        
+                        
+                        if [ "$is_lts" == "true" ]; then
+                        
+                            PACKAGES+=" linux-lts-headers"
+                        fi
+                        
+                        #For custom kernels it is necessary to install appropriate headers!
+                    ;;
+                    
+                    clamav)
+                    
+                        SERVICES+=" clamav-freshclam"
+                    ;;
+                esac
+            fi
+        done
+    done
+}
+
+function select_one () {
 
     declare MESSAGE=""
     declare OFFICIAL_PKGS=""
@@ -511,7 +603,7 @@ function choose_one () {
     echo
     
     #Selection
-    prompt_question "Please choose one: "
+    prompt_question "Please select one: "
     number_check "$max"
     
     #Include it in the installation
@@ -866,6 +958,7 @@ fi
 export LIGHT_RED="$LIGHT_RED"
 export YELLOW="$YELLOW"
 export LIGHT_GREEN="$LIGHT_GREEN"
+export LIGHT_CYAN="$LIGHT_CYAN"
 export NOCOLOUR="$NOCOLOUR"
 
 export USER_NAME="$USER_NAME"
@@ -1048,7 +1141,7 @@ fi
 #https://www.thomas-krenn.com/en/wiki/Partition_Alignment_detailed_explanation
 
 
-printf "${LIGHT_CYAN}Do you want to use auto partitioning? ${LIGHT_RED}-Everything will be ERASED- (y/n): ${NOCOLOUR}"
+printf "${LIGHT_CYAN}Do you want to use auto partitioning? ${LIGHT_RED}-Everything will be ERASED-${LIGHT_CYAN} (y/n): ${NOCOLOUR}"
 yes_no
 if [ "$ANSWER" == "y" ]; then
 
@@ -1582,9 +1675,8 @@ AUR_PACKAGES+="$PKG_SELECT"
 
 print_packages
 
-
 #Greeter selection
-choose_one "Greeter packages are: " "$GREETER" "$GREETER_AUR"
+select_one "Greeter packages are: " "$GREETER" "$GREETER_AUR"
 SELECTED_GREETER="$SELECTION"
 
 print_packages
@@ -1595,11 +1687,12 @@ prompt_info "Your graphics card model is:"
 lspci -v | grep -A1 -e VGA -e 3D
 echo
 
-choose_one "Driver Packages are: " "$VIDEO_DRIVER" "$VIDEO_DRIVER_AUR"
+select_one "Driver Packages are: " "$VIDEO_DRIVER" "$VIDEO_DRIVER_AUR"
 SELECTED_VIDEO_DRIVER="$SELECTION"
 
-print_packages
+pkg_specific_operations "virtualbox" "clamav"
 
+print_packages
 
 #Sort mirrorslist
 check_connection
