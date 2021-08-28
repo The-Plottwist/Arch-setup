@@ -944,15 +944,16 @@ fi
 
 #Copy background images
 prompt_info "Copying background images..."
-if [ -f "Login_screen.png" ]; then
+if [ -d "assets" ]; then
 
-    cp Login_screen.png $MOUNT_PATH/usr/share/backgrounds
-fi
+    cp assets/Login_screen.png $MOUNT_PATH/usr/share/backgrounds
+    cp assets/Background.png $MOUNT_PATH/usr/share/backgrounds
 
-#Changing xfce'\''s default background with mine :)
-if output=$([ -f "Background.png" ] && [ -d "$MOUNT_PATH/usr/share/backgrounds/xfce" ]); then
-
-    cp Background.png $MOUNT_PATH/usr/share/backgrounds/xfce/xfce-verticals.png
+    #Change xfce'\''s default background
+    if [ -d "$MOUNT_PATH/usr/share/backgrounds/xfce" ]; then
+    
+        cp assets/Background.png $MOUNT_PATH/usr/share/backgrounds/xfce/xfce-verticals.png
+    fi
 fi
 
 #Exporting variables to be able to use in chroot
