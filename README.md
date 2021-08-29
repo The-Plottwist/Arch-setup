@@ -56,6 +56,6 @@ A large proportion of the linux users are already familiar with bash and it does
 
 - <https://wiki.archlinux.org/title/EFI_system_partition#Create_the_partition>
 
-- <https://wiki.archlinux.org/title/EFI_system_partition#Mount_the_partition> (Option three)
+- <https://wiki.archlinux.org/title/EFI_system_partition#Typical_mount_points> (Option three)
 
 - <https://wiki.archlinux.org/title/Dm-crypt/Encrypting_an_entire_system#LVM_on_LUKS>
