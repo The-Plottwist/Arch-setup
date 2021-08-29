@@ -30,7 +30,7 @@
 #https://wiki.archlinux.org/title/Installation_guide
 
 
-# ----------------------------- Function Globals ----------------------------- #
+# ---------------------------------- Globals --------------------------------- #
 
 declare PROGRAM_NAME=""
 PROGRAM_NAME="arch-setup.sh"
@@ -63,7 +63,9 @@ declare SYSTEM_PARTITION=""
 declare HOME_PARTITION=""
 declare SWAP_PARTITION=""
 
-
+#For performing package specific operations
+#Related funciton is: pkg_specific
+declare PKG_SPECIFIC="virtualbox clamav lightdm-slick-greeter"
 
 # ---------------------------- Packages To Install --------------------------- #
 
@@ -1730,7 +1732,7 @@ echo
 select_one "Available driver packages are:" "$VIDEO_DRIVER" "$VIDEO_DRIVER_AUR"
 SELECTED_VIDEO_DRIVER="$SELECTION"
 
-pkg_specific "virtualbox" "clamav" "lightdm-slick-greeter"
+pkg_specific $PKG_SPECIFIC
 
 print_packages
 
