@@ -32,6 +32,8 @@ After booting into the iso:
 
 - Set your [keyboard layout](https://wiki.archlinux.org/title/Installation_guide#Set_the_keyboard_layout)
 
+- Download git with `pacman -S git`
+
 - Clone the repo with `git clone https://github.com/The-Plottwist/Arch-setup`
 
 - Change your directory to `Arch-setup` (This is necessary for background images)
