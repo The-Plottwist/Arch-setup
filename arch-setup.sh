@@ -70,7 +70,7 @@ declare SWAP_PARTITION=""
 declare CORE_PACKAGES="base linux linux-firmware"
 
 #Warning: Do not delete nano! it is used in the script.
-#Warning: This variable is also modified from the pkg_specific_operations function!
+#Warning: This variable is also modified from the pkg_specific function!
 declare PACKAGES="os-prober lvm2 sudo base-devel screen git python python-pip cpupower thermald dhcpcd dhclient flatpak parted htop lshw man-db man-pages texinfo mc nano net-tools network-manager-applet networkmanager nm-connection-editor ntfs-3g pacman-contrib unrar unzip p7zip usbutils wget xdg-user-dirs firefox deluge gimp inkscape keepassxc libreoffice-fresh vlc cups"
 
 #All additional packages will be asked to user.
@@ -82,7 +82,7 @@ declare BOOTLOADER_PACKAGES="grub intel-ucode amd-ucode"
 declare DE_PACKAGES="xorg xorg-server xfce4 xfce4-goodies"
 declare DE_DEPENDENT_PACKAGES="xsane system-config-printer gparted deluge-gtk foliate eom evolution evolution-on file-roller atril gvfs gvfs-mtp gufw pavucontrol pulseaudio seahorse"
 
-declare AUR_PACKAGES="lightdm-settings cpupower-gui-git nano-syntax-highlighting"
+declare AUR_PACKAGES="cpupower-gui-git nano-syntax-highlighting"
 declare ADDITIONAL_AUR_PACKAGES="ttf-ms-fonts"
 
 declare DISPLAY_MANAGER="lightdm"
@@ -95,7 +95,8 @@ declare VIDEO_DRIVER="xf86-video-intel xf86-video-nouveau xf86-video-ati xf86-vi
 declare VIDEO_DRIVER_AUR="nvidia-390xx"
 declare SELECTED_VIDEO_DRIVER=""
 
-#Warning: This variable is also modified from the pkg_specific_operations function!
+#Warning: This variable is also modified from the pkg_specific function!
+#Services to enable
 declare SERVICES="dhcpcd NetworkManager thermald cpupower lightdm"
 
 
@@ -516,7 +517,7 @@ function pkg_find () {
 
 #A space must be put before adding it to the package set
 #i.e. syntax should be: foo+=" bar"
-function pkg_specific_operations () {
+function pkg_specific () {
 
     pkg_find "$@"
     
@@ -565,12 +566,18 @@ function pkg_specific_operations () {
                             PACKAGES+=" linux-lts-headers"
                         fi
                         
-                        #For custom kernels it is necessary to install appropriate headers!
+                        #Warning! If you are using a custom kernel, find & install appropriate headers.
+                        #They are not installed by default.
                     ;;
                     
                     clamav)
                     
                         SERVICES+=" clamav-freshclam"
+                    ;;
+                    
+                    lightdm-slick-greeter)
+                    
+                        AUR_PACKAGES+=" lightdm-settings"
                     ;;
                 esac
             fi
@@ -1723,7 +1730,7 @@ echo
 select_one "Available driver packages are:" "$VIDEO_DRIVER" "$VIDEO_DRIVER_AUR"
 SELECTED_VIDEO_DRIVER="$SELECTION"
 
-pkg_specific_operations "virtualbox" "clamav"
+pkg_specific "virtualbox" "clamav" "lightdm-slick-greeter"
 
 print_packages
 
