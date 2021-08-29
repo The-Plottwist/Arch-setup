@@ -20,17 +20,17 @@
 # -------------------------------------------------------------------------- #
 
 
-#Important note:
-#This script is consists of two phases.
-#First phase includes: Partitioning - Installing system - Installing bootloader & official packages - Adding user account & Setting a root password etc.
-#Second phase includes: Installing aur helper & aur packages - Enabling services etc.
+
+#Auto partitioning wipes hard disk entirely, therefore it is disabled by default.
+#To enable at your own risk, uncomment the below line
+#declare ENABLE_AUTO_PARTITIONING="true"
 
 
 #Followed guide:
 #https://wiki.archlinux.org/title/Installation_guide
 
 
-# ---------------------------------- Globals --------------------------------- #
+# ----------------------------- Function Globals ----------------------------- #
 
 declare PROGRAM_NAME=""
 PROGRAM_NAME="arch-setup.sh"
@@ -64,26 +64,30 @@ declare HOME_PARTITION=""
 declare SWAP_PARTITION=""
 
 
-#All additional packages will be asked to the user.
-#They will be added to the original set if accepted.
+
+# ---------------------------- Packages To Install --------------------------- #
+
 declare CORE_PACKAGES="base linux linux-firmware"
 
+#Warning: Do not delete nano! it is used in the script.
 #Warning: This variable is also modified from the pkg_specific_operations function!
 declare PACKAGES="os-prober lvm2 sudo base-devel screen git python python-pip cpupower thermald dhcpcd dhclient flatpak parted htop lshw man-db man-pages texinfo mc nano net-tools network-manager-applet networkmanager nm-connection-editor ntfs-3g pacman-contrib unrar unzip p7zip usbutils wget xdg-user-dirs firefox deluge gimp inkscape keepassxc libreoffice-fresh vlc cups"
 
-declare ADDITIONAL_PACKAGES="virtualbox jre-openjdk vnstat clamav moreutils gparted"
+#All additional packages will be asked to user.
+#They will be added to the original set if accepted.
+declare ADDITIONAL_PACKAGES="virtualbox clamav"
 
 declare BOOTLOADER_PACKAGES="grub intel-ucode amd-ucode"
 
 declare DE_PACKAGES="xorg xorg-server xfce4 xfce4-goodies"
-declare DE_DEPENDENT_PACKAGES="xsane system-config-printer deluge-gtk foliate eom evolution evolution-on file-roller atril gvfs gvfs-mtp gufw pavucontrol pulseaudio seahorse"
+declare DE_DEPENDENT_PACKAGES="xsane system-config-printer gparted deluge-gtk foliate eom evolution evolution-on file-roller atril gvfs gvfs-mtp gufw pavucontrol pulseaudio seahorse"
 
 declare AUR_PACKAGES="lightdm-settings cpupower-gui-git nano-syntax-highlighting"
 declare ADDITIONAL_AUR_PACKAGES="ttf-ms-fonts"
 
 declare DISPLAY_MANAGER="lightdm"
 
-declare GREETER=""
+declare GREETER="lightdm-gtk-greeter"
 declare GREETER_AUR="lightdm-slick-greeter"
 declare SELECTED_GREETER=""
 
@@ -166,9 +170,9 @@ function prompt_different () {
     printf "${LIGHT_GREEN}%s${NOCOLOUR}" "$1"
 }
 
-function prompt_path () {
+function prompt_partition () {
 
-    printf "${LIGHT_CYAN}Please enter the${LIGHT_RED} PATH ${LIGHT_CYAN}for %s${NOCOLOUR}" "$1"
+    printf "${LIGHT_CYAN}Please enter the${LIGHT_RED} PATH ${LIGHT_CYAN}for${LIGHT_RED} %s ${LIGHT_CYAN}partition:${NOCOLOUR}" "$1"
 }
 
 
@@ -238,7 +242,7 @@ function Umount_ () {
 
     #Inform the kernel
     prompt_info "Informing kernel about partition changes..."
-    partprobe
+    partprobe &> /dev/null
 }
 
 
@@ -263,14 +267,14 @@ function failure () {
 
 function yes_no () {
 
-    read -e -r ANSWER
+    read -e -r -p " " ANSWER
 
     while ! output=$([ "$ANSWER" == "y" ] || [ "$ANSWER" == "Y" ] || [ "$ANSWER" == "n" ] || [ "$ANSWER" == "N" ]); do
 
         echo
         prompt_warning "Wrong answer!"
-        printf "Please try again: "
-        read -e -r ANSWER
+        printf "Please try again:"
+        read -e -r -p " " ANSWER
     done
 
     if [ "$ANSWER" == "Y" ]; then ANSWER="y"; fi
@@ -293,7 +297,7 @@ function disk_check () {
     else
         
         IS_ARGUMENT="false"
-        read -e -r INPUT
+        read -e -r -p " " INPUT
     fi
     
 
@@ -304,7 +308,7 @@ function disk_check () {
             
             prompt_warning "The disk '$INPUT' couldn't found."
             printf "${LIGHT_RED}Please try again: ${NOCOLOUR}"
-            read -e -r INPUT
+            read -e -r -p " " INPUT
         else
         
             return 12
@@ -331,7 +335,7 @@ function partition_check () {
     else
         
         IS_ARGUMENT="false"
-        read -e -r INPUT
+        read -e -r -p " " INPUT
     fi
 
     #Use awk to remove unnecessary spaces
@@ -341,7 +345,7 @@ function partition_check () {
             
             prompt_warning "Partition '$INPUT' couldn't found."
             printf "${LIGHT_RED}Please try again: ${NOCOLOUR}"
-            read -e -r INPUT
+            read -e -r -p " " INPUT
         else
         
             return 13
@@ -378,7 +382,7 @@ function number_check () {
     else
         
         IS_ARGUMENT="false"
-        read -e -r NUMBER_CHECK
+        read -e -r -p " " NUMBER_CHECK
     fi
     
     while output=$( [[ ! $NUMBER_CHECK =~ ^[0-9]+$ ]] || (( NUMBER_CHECK > max_ )) || (( NUMBER_CHECK == 0 )) ); do
@@ -386,8 +390,8 @@ function number_check () {
         if [ "$IS_ARGUMENT" == "false" ]; then
             
             prompt_warning "Wrong number!"
-            prompt_question "Please re-enter: "
-            read -e -r NUMBER_CHECK
+            prompt_question "Please re-enter:"
+            read -e -r -p " " NUMBER_CHECK
         else
         
             return 14
@@ -402,6 +406,7 @@ function print_packages () {
     
     echo
     printf "${LIGHT_GREEN}For printer drivers follow this link: ${PURPLE}https://wiki.archlinux.org/title/CUPS/Printer-specific_problems#Epson"
+    echo
     
     prompt_warning "Current selected packages are:"
     echo
@@ -583,7 +588,6 @@ function select_one () {
     OFFICIAL_PKGS="$2"
     AUR_PKGS="$3"
 
-    #Print packages
     prompt_different "$MESSAGE"
     echo
     echo
@@ -602,10 +606,11 @@ function select_one () {
         max+=1
         printf "${PURPLE}%s (${LIGHT_CYAN}%s${PURPLE}) ${NOCOLOUR}" "$i" "$max"
     done
-    echo
     
     #Selection
-    prompt_question "Please select one: "
+    echo
+    echo
+    prompt_question "Please select one:"
     number_check "$max"
     
     #Include it in the installation
@@ -657,7 +662,9 @@ PROGRAM_NAME=\"setup-second-phase.sh\"
 #Colours for colourful output
 declare LIGHT_RED='\033[1;31m'
 declare YELLOW='\033[1;33m'
+declare PURPLE='\033[0;35m'
 declare LIGHT_GREEN='\033[1;32m'
+declare LIGHT_CYAN='\033[1;36m'
 declare NOCOLOUR='\033[0m' #No Colour
 
 declare MOUNT_PATH=\"$MOUNT_PATH\"
@@ -754,7 +761,7 @@ function Umount_ () {
 
     #Inform the kernel
     prompt_info "Informing kernel about partition changes..."
-    partprobe
+    partprobe &> /dev/null
 }
 
 function Exit_ () {
@@ -891,7 +898,7 @@ function aur () {
                 printf "${LIGHT_RED}greeter-session=example-gtk-gnome ${LIGHT_GREEN}should be equal to ${LIGHT_RED}greeter_session=$SELECTED_GREETER ${LIGHT_GREEN}-which is under the [Seat:*] section-${NOCOLOUR}"
                 
                 prompt_warning "Press enter to continue..."
-                read -e -r TMP
+                read -e -r -p " " TMP
             fi
         else
         
@@ -901,13 +908,13 @@ function aur () {
             printf "${LIGHT_RED}greeter-session=example-gtk-gnome ${LIGHT_GREEN}should be equal to ${LIGHT_RED}greeter_session=$SELECTED_GREETER ${LIGHT_GREEN}-which is under the [Seat:*] section-${NOCOLOUR}"
             
             prompt_warning "Press enter to continue..."
-            read -e -r TMP
+            read -e -r -p " " TMP
         fi
         
-        printf "${LIGHT_RED}For troubleshooting about lightdm, follow this link: ${PURPLE}https://wiki.archlinux.org/title/LightDM#Troubleshooting${NOCOLOUR}\n\n"
-        for i in {10..1}; do
+        printf "${YELLOW}For troubleshooting about lightdm, follow this link: ${PURPLE}https://wiki.archlinux.org/title/LightDM#Troubleshooting${NOCOLOUR}\n\n"
+        for i in {10..0}; do
 
-            printf "${LIGHT_GREEN}Continuing in ${LIGHT_CYAN}$i\033[0K\r${NOCOLOUR}"
+            printf "${LIGHT_GREEN}Continuing in ${LIGHT_CYAN}%s${NOCOLOUR}\033[0K\r" "$i"
             sleep 1s
         done
     fi
@@ -958,8 +965,9 @@ if [ -d "assets" ]; then
 fi
 
 #Exporting variables to be able to use in chroot
-export LIGHT_RED="$LIGHT_RED"
 export YELLOW="$YELLOW"
+export PURPLE="$PURPLE"
+export LIGHT_RED="$LIGHT_RED"
 export LIGHT_GREEN="$LIGHT_GREEN"
 export LIGHT_CYAN="$LIGHT_CYAN"
 export NOCOLOUR="$NOCOLOUR"
@@ -987,7 +995,18 @@ timedatectl set-ntp true
 Umount_
 
 echo
-printf "${LIGHT_GREEN}ARCH SETUP FINISHED!!${NOCOLOUR}"
+echo
+
+#http://patorjk.com/software/taag/#p=display&f=ANSI%20Shadow&t=!!%20Setup%20finished%20!!
+printf "${LIGHT_CYAN}
+██╗██╗    ███████╗███████╗████████╗██╗   ██╗██████╗     ███████╗██╗███╗   ██╗██╗███████╗██╗  ██╗███████╗██████╗     ██╗██╗
+██║██║    ██╔════╝██╔════╝╚══██╔══╝██║   ██║██╔══██╗    ██╔════╝██║████╗  ██║██║██╔════╝██║  ██║██╔════╝██╔══██╗    ██║██║
+██║██║    ███████╗█████╗     ██║   ██║   ██║██████╔╝    █████╗  ██║██╔██╗ ██║██║███████╗███████║█████╗  ██║  ██║    ██║██║
+╚═╝╚═╝    ╚════██║██╔══╝     ██║   ██║   ██║██╔═══╝     ██╔══╝  ██║██║╚██╗██║██║╚════██║██╔══██║██╔══╝  ██║  ██║    ╚═╝╚═╝
+██╗██╗    ███████║███████╗   ██║   ╚██████╔╝██║         ██║     ██║██║ ╚████║██║███████║██║  ██║███████╗██████╔╝    ██╗██╗
+╚═╝╚═╝    ╚══════╝╚══════╝   ╚═╝    ╚═════╝ ╚═╝         ╚═╝     ╚═╝╚═╝  ╚═══╝╚═╝╚══════╝╚═╝  ╚═╝╚══════╝╚═════╝     ╚═╝╚═╝
+${NOCOLOUR}"
+
 echo
 printf "${LIGHT_GREEN}You can safely reboot now.${NOCOLOUR}"
 echo
@@ -1072,10 +1091,10 @@ check_connection
 #Get device name
 while true; do
 
-    prompt_question "Please enter device name: "
-    read -e -r DEVICE
-    prompt_question "Please re-enter: "
-    read -e -r CHECK
+    prompt_question "Please enter device name:"
+    read -e -r -p " " DEVICE
+    prompt_question "Please re-enter:"
+    read -e -r -p " " CHECK
 
     if [ "$DEVICE" == "$CHECK" ]; then
 
@@ -1095,7 +1114,8 @@ done
 clear
 lsblk -o +path,partlabel | head -1
 lsblk -o +path,partlabel | grep "disk"
-prompt_path "the disk you want to operate: "
+echo
+printf "${LIGHT_CYAN}Please enter the${LIGHT_RED} PATH ${LIGHT_CYAN}for the disk you want to operate:${NOCOLOUR}"
 disk_check
 DISK="$DISK_CHECK"
 
@@ -1143,16 +1163,13 @@ fi
 #In the below link, you can find the answer for the question of - Why first partition generally starts from sector 2048 (1mib)? -
 #https://www.thomas-krenn.com/en/wiki/Partition_Alignment_detailed_explanation
 
+if [ "$ENABLE_AUTO_PARTITIONING" == "true" ]; then
 
-printf "${LIGHT_CYAN}Do you want to use auto partitioning? ${LIGHT_RED}-Everything will be ERASED-${LIGHT_CYAN} (y/n): ${NOCOLOUR}"
-yes_no
-if [ "$ANSWER" == "y" ]; then
-
-    prompt_question "Are you sure? (y/n): "
+    printf "${LIGHT_CYAN}Do you want to use auto partitioning? ${LIGHT_RED}-Everything will be ERASED-${LIGHT_CYAN} (y/n): ${NOCOLOUR}"
     yes_no
 fi
 
-if [ "$ANSWER" == "y" ]; then
+if output=$([ "$ENABLE_AUTO_PARTITIONING" == "true" ] && [ "$ANSWER" == "y" ] ); then
 
 
     #GPT is required for disks that are bigger than 2TiB
@@ -1211,7 +1228,7 @@ if [ "$ANSWER" == "y" ]; then
         echo
         prompt_warning "Note: Some elder hardware may have issues when booting from GPT."
         echo
-        prompt_question "Do you still want to use MBR? (y/n): "
+        prompt_question "Do you still want to use MBR? (y/n):"
         yes_no
         if [ "$ANSWER" == "y" ]; then
         
@@ -1223,7 +1240,7 @@ if [ "$ANSWER" == "y" ]; then
     fi
 
 
-    prompt_question "Do you want an encrypted system partition? (y/n): "
+    prompt_question "Do you want an encrypted system partition? (y/n):"
     yes_no
     if [ "$ANSWER" == "y" ]; then
     
@@ -1232,8 +1249,21 @@ if [ "$ANSWER" == "y" ]; then
     
         IS_ENCRYPT="false"
     fi
-    
-    
+
+
+    # ---------------------------------------------------------------------------- #
+    #                        Countdown before hard disk wipe                       #
+    # ---------------------------------------------------------------------------- #
+    clear
+    for i in {10..0}; do
+
+        printf "${LIGHT_RED}DANGER! Hard disk will be WIPED in: ${LIGHT_CYAN}%s${NOCOLOUR}\033[0K\r" "$i"
+        echo
+        printf "${LIGHT_RED}- You can quit with Ctrl-C -${NOCOLOUR}\033[0K\r" "$i"
+        sleep 1s
+    done
+
+
     if [ "$IS_ENCRYPT" == "true" ]; then
     
         if [ "$IS_UEFI" == "true" ]; then #Encrypt true, UEFI=true
@@ -1282,7 +1312,7 @@ if [ "$ANSWER" == "y" ]; then
         fi
     else
     
-        prompt_question "Do you want seperate home and system partitions? (y/n): "
+        prompt_question "Do you want seperate home and system partitions? (y/n):"
         yes_no
         if [ "$ANSWER" == "y" ]; then
         
@@ -1441,7 +1471,7 @@ else #Manual partition selection
         declare -i current_=0
     
         prompt_warning "In this option, encrypted partitions will not be handled automatically."
-        printf "${LIGHT_RED}You need to follow one of the guides in: ${LIGHT_CYAN}https://wiki.archlinux.org/title/Dm-crypt/Encrypting_an_entire_system#Overview${NOCOLOUR}"
+        printf "${YELLOW}You need to follow one of the guides in: ${PURPLE}https://wiki.archlinux.org/title/Dm-crypt/Encrypting_an_entire_system#Overview${NOCOLOUR}"
         echo
         prompt_info "LUKS partitions found!"
         printf "\033[1A"
@@ -1451,7 +1481,7 @@ else #Manual partition selection
     
         for i in $LUKS; do
     
-            prompt_question "Do you want to open $i (y/n): "
+            prompt_question "Do you want to open $i (y/n):"
             yes_no
     
             if [ "$ANSWER" == "y" ]; then
@@ -1504,7 +1534,7 @@ else #Manual partition selection
     
         while true; do
             
-            prompt_path "EFI System partiton: "
+            prompt_partition "EFI System"
             partition_check
             mount "$PART_CHECK" /mnt/is_esp
             
@@ -1527,29 +1557,29 @@ else #Manual partition selection
     fi
     
     #Get Boot
-    prompt_path "a Boot partition: "
+    prompt_partition "BOOT"
     partition_check
     BOOT_PARTITION="$PART_CHECK"
     
     #Get Swap
-    prompt_path "a Swap partition: "
+    prompt_partition "SWAP"
     partition_check
     SWAP_PARTITION="$PART_CHECK"
 
     #Is seperate?
-    prompt_different "Does home and system partitions seperate? (y/n): "
+    prompt_different "Does home and system partitions seperate? (y/n):"
     yes_no
     if [ "$ANSWER" == "y" ]; then
     
         IS_SEPERATE="true"
     
         #Get System
-        prompt_path "a System partition: "
+        prompt_partition "SYSTEM"
         partition_check
         SYSTEM_PARTITION="$PART_CHECK"
     
         #Home
-        prompt_path "a Home partition: "
+        prompt_partition "HOME"
         partition_check
         HOME_PARTITION="$PART_CHECK"
     else
@@ -1557,7 +1587,7 @@ else #Manual partition selection
         IS_SEPERATE="false"
     
         #Get Systen
-        prompt_path "a System partition: "
+        prompt_partition "SYSTEM"
         partition_check
         SYSTEM_PARTITION="$PART_CHECK"
     fi
@@ -1679,18 +1709,18 @@ AUR_PACKAGES+="$PKG_SELECT"
 print_packages
 
 #Greeter selection
-select_one "Greeter packages are: " "$GREETER" "$GREETER_AUR"
+select_one "Greeter packages are:" "$GREETER" "$GREETER_AUR"
 SELECTED_GREETER="$SELECTION"
 
 print_packages
 
-#Video driver selction
+#Video driver selection
 #Get model
-prompt_info "Your graphics card model is:"
+prompt_different "Your graphics card model is:"
 lspci -v | grep -A1 -e VGA -e 3D
 echo
 
-select_one "Driver Packages are: " "$VIDEO_DRIVER" "$VIDEO_DRIVER_AUR"
+select_one "Available driver packages are:" "$VIDEO_DRIVER" "$VIDEO_DRIVER_AUR"
 SELECTED_VIDEO_DRIVER="$SELECTION"
 
 pkg_specific_operations "virtualbox" "clamav"
@@ -1699,7 +1729,7 @@ print_packages
 
 #Sort mirrorslist
 check_connection
-printf "${LIGHT_GREEN}Do you want to sort the mirror list to make the downloads faster?${LIGHT_RED} -It will persist in the system but will take a while- ${LIGHT_GREEN}(y/n): ${NOCOLOUR}"
+printf "${LIGHT_GREEN}Do you want to sort the mirror list to make the downloads faster?${LIGHT_RED} - It will persist in the system but will take a while - ${LIGHT_GREEN}(y/n): ${NOCOLOUR}"
 yes_no
 if [ "$ANSWER" == "y" ]; then
 
@@ -1748,9 +1778,11 @@ function setup () {
 
             printf "${LIGHT_CYAN}Ctrl-C ${LIGHT_RED}will not work hereafter.${NOCOLOUR}"
             echo
-            printf "${LIGHT_GREEN}If you're dual booting with Windows, follow this link: ${PURPLE}https://wiki.archlinux.org/title/System_time#UTC_in_Microsoft_Windows${NOCOLOUR}"
+            printf "${YELLOW}If you're dual booting with Windows, follow this link: ${PURPLE}https://wiki.archlinux.org/title/System_time#UTC_in_Microsoft_Windows${NOCOLOUR}"
             echo
-            printf "${LIGHT_GREEN}Please find your timezone in the list. ${LIGHT_RED}(Press 'q' to quit and use '/' to search)${NOCOLOUR}"
+            printf "${LIGHT_GREEN}Please find your timezone in the list.${NOCOLOUR}"
+            echo
+            prompt_question "(q: Quit listing mode, /: Search forward, ?: Search backward, h: help; Navigation: ↑↓, pg-up, pg-down)"
             echo
             echo
 
@@ -1768,8 +1800,8 @@ function setup () {
     declare INPUT=""
     while true; do
     
-        prompt_question "Please specify the number of your timezone -Type 'r' to re-list-: "
-        read -e -r INPUT
+        prompt_question "Please specify the number of your timezone - Type 'r' to re-list -:"
+        read -e -r -p " " INPUT
         
         if [ "$INPUT" == "r" ]; then
         
@@ -1787,14 +1819,20 @@ function setup () {
     done
     
     TIMEZONE=$(echo "$LIST" | head -"$NUMBER_CHECK" | tail -1)
+    
+    echo
+    echo
+    printf "${LIGHT_GREEN}Your timezone is: ${LIGHT_CYAN}%s${NOCOLOUR}" "$TIMEZONE"
+    echo
+    
     prompt_info "Setting timezone..."
     ln -sf /usr/share/zoneinfo/"$TIMEZONE" /etc/localtime
     
     #Locales
     printf "${LIGHT_GREEN}Please uncomment the needed locales ${LIGHT_RED}(en_US.UTF-8 UTF-8 and YOUR_LOCALE)${LIGHT_GREEN} in the file that is going to open.${NOCOLOUR}\n"
-    printf "${LIGHT_GREEN}You can press ${LIGHT_RED}Ctrl-S${LIGHT_GREEN} to save and ${LIGHT_RED}Ctrl-X${LIGHT_GREEN} to exit.${NOCOLOUR}\n"
+    prompt_question "(Ctrl-s: Save, Ctrl-x: Quit, Ctrl-g: Help)"
     prompt_warning "Press enter to continue..."
-    read -e -r TMP
+    read -e -r -p " " TMP
     nano /etc/locale.gen
     clear
     
@@ -1810,10 +1848,10 @@ function setup () {
 
         printf "${LIGHT_GREEN}Please write your keyboard layout in the file that is going to open. ${LIGHT_RED}(ex: KEYMAP=de-latin1)${NOCOLOUR}"
         echo
-        printf "${LIGHT_GREEN}You can press ${LIGHT_RED}Ctrl-S${LIGHT_GREEN} to save and ${LIGHT_RED}Ctrl-X${LIGHT_GREEN} to exit.${NOCOLOUR}"
+        prompt_question "(Ctrl-s: Save, Ctrl-x: Quit, Ctrl-g: Help)"
         echo
         prompt_warning "Press enter to continue..."
-        read -e -r TMP
+        read -e -r -p " " TMP
         nano /etc/vconsole.conf
         clear
     fi
@@ -1868,7 +1906,7 @@ function setup () {
         prompt_different "Just add '#' to the begining of the first 'HOOKS=...' line."
         echo
         prompt_warning "Press enter to continue..."
-        read -e -r TMP
+        read -e -r -p " " TMP
         
         nano /etc/mkinitcpio.conf
         clear
@@ -1922,7 +1960,7 @@ function setup () {
         prompt_different "Needed format appended to the file.\n"
         printf "${LIGHT_GREEN}Just add '#' to the beginning of the first ${LIGHT_RED}'GRUB_CMDLINE_LINUX='${LIGHT_GREEN} line.${NOCOLOUR}\n"
         prompt_warning "Press enter to continue..."
-        read -e -r TMP
+        read -e -r -p " " TMP
         
         nano /etc/default/grub
         clear
@@ -1930,10 +1968,10 @@ function setup () {
     prompt_info "Generating grub.cfg..."
     grub-mkconfig -o /boot/grub/grub.cfg
     
-    printf "${LIGHT_RED}For troubleshooting about suspend/hibernate, follow this link: ${PURPLE}https://wiki.archlinux.org/title/Power_management/Suspend_and_hibernate#Troubleshooting${NOCOLOUR}\n\n"
-    for i in {10..1}; do
+    printf "${YELLOW}For troubleshooting about suspend/hibernate, follow this link: ${PURPLE}https://wiki.archlinux.org/title/Power_management/Suspend_and_hibernate#Troubleshooting${NOCOLOUR}\n\n"
+    for i in {10..0}; do
 
-        printf "${LIGHT_GREEN}Continuing in ${LIGHT_CYAN}$i\033[0K\r${NOCOLOUR}"
+        printf "${LIGHT_GREEN}Continuing in ${LIGHT_CYAN}%s${NOCOLOUR}\033[0K\r" "$i"
         sleep 1s
     done
     
@@ -1956,7 +1994,7 @@ function setup () {
         
         echo "${LIGHT_GREEN}Just delete the '#' ${LIGHT_RED}'# %sudo...'${LIGHT_GREEN} line.${NOCOLOUR}"
         prompt_warning "Press enter to continue..."
-        read -e -r TMP
+        read -e -r -p " " TMP
         
         nano /etc/sudoers
         clear
@@ -1970,11 +2008,11 @@ function setup () {
     declare CHECK=""
     while true; do
     
-        prompt_question "Enter a name for new user: "
-        read -e -r USER_NAME
+        prompt_question "Enter a name for new user:"
+        read -e -r -p " " USER_NAME
         
-        prompt_question "Please re-enter: "
-        read -e -r CHECK
+        prompt_question "Please re-enter:"
+        read -e -r -p " " CHECK
         
         if [ "$USER_NAME" == "$CHECK" ]; then
         
@@ -2055,6 +2093,6 @@ setup-second-phase
 #Remove lock
 rm -f "/tmp/$PROGRAM_NAME.lock"
 
-#Finish
-prompt_different "Please run ./setup-second-phase.sh command!"
+#First phase finish
+prompt_warning "Please type ./setup-second-phase.sh"
 echo
