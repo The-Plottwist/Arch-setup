@@ -1149,21 +1149,41 @@ fi
 #You can visit the below link for additional information
 #https://wiki.gentoo.org/wiki/Handbook:AMD64/Installation/Disks#Partition_tables
 
+#Get info
+declare PARTED_INFO=""
+PARTED_INFO="$(parted "$DISK" --script "u mib" \ "print")"
+
 #Get disk size in MiB and subtract the extension
-DISK_SIZE_MIB=$(parted "$DISK" --script "u mib" \ "print" | grep "Disk $DISK:" | awk '{print $3}' | sed s/[A-Za-z]//g)
+DISK_SIZE_MIB=$(echo "$PARTED_INFO" | grep "Disk $DISK:" | awk '{print $3}' | sed s/[A-Za-z]//g)
 
 #Convert it to TiB
 DISK_SIZE_TIB=$(( DISK_SIZE_MIB/(1024*1024) ))
 
-#Wait before using parted again in case the disk is old
-sleep 2s
-
 #Get Partition Table
-PARTITION_TABLE=$(parted "$DISK" --script print | grep "Partition Table:" | awk '{print $3}')
+PARTITION_TABLE=$(echo "$PARTED_INFO" | grep "Partition Table:" | awk '{print $3}')
 
 if output=$([ "$PARTITION_TABLE" != "msdos" ] && [ "$PARTITION_TABLE" != "gpt" ]); then
 
     PARTITION_TABLE="other"
+fi
+
+#Trimming
+#https://wiki.archlinux.org/title/Solid_state_drive#TRIM
+if echo "$PARTED_INFO" | head -1 | grep -w -q SSD; then
+
+    declare TRIM_INFO=""
+    declare DISC_GRAN=""
+    declare DISC_MAX=""
+    
+    TRIM_INFO="$(lsblk "$DISK" -o type,DISC-GRAN,DISC-MAX | grep -w disk)"
+    DISC_GRAN=$(echo "$TRIM_INFO" | awk '{print $2}')
+    DISC_MAX=$(echo "$TRIM_INFO" | awk '{print $3}')
+    
+    #Check if it supports trimming
+    if output=$([ "$DISC_GRAN" != "0B" ] && [ "$DISC_MAX" != "0B" ]); then
+    
+        SERVICES+=" fstrim.timer"
+    fi
 fi
 
 
