@@ -64,15 +64,15 @@ declare HOME_PARTITION=""
 declare SWAP_PARTITION=""
 
 #For performing package specific operations
-#Related funciton is: pkg_specific
-declare PKG_SPECIFIC="virtualbox clamav lightdm-slick-greeter"
+#Related funciton is: pkg_specific_operations
+declare PKG_SPECIFIC_OPERATIONS="virtualbox clamav lightdm-slick-greeter"
 
 # ---------------------------- Packages To Install --------------------------- #
 
 declare CORE_PACKAGES="base linux linux-firmware"
 
 #Warning: Do not delete nano! it is used in the script.
-#Warning: This variable is also modified from the pkg_specific function!
+#Warning: This variable is also modified from the pkg_specific_operations function!
 declare PACKAGES="os-prober lvm2 sudo base-devel screen git python python-pip cpupower thermald dhcpcd dhclient flatpak parted htop lshw man-db man-pages texinfo mc nano net-tools network-manager-applet networkmanager nm-connection-editor ntfs-3g pacman-contrib unrar unzip p7zip usbutils wget xdg-user-dirs firefox deluge gimp inkscape keepassxc libreoffice-fresh vlc cups"
 
 #All additional packages will be asked to user.
@@ -97,7 +97,7 @@ declare VIDEO_DRIVER="xf86-video-intel xf86-video-nouveau xf86-video-ati xf86-vi
 declare VIDEO_DRIVER_AUR="nvidia-390xx"
 declare SELECTED_VIDEO_DRIVER=""
 
-#Warning: This variable is also modified from the pkg_specific function!
+#Warning: This variable is also modified from the pkg_specific_operations function!
 #Services to enable
 declare SERVICES="dhcpcd NetworkManager thermald cpupower lightdm"
 
@@ -498,10 +498,9 @@ function pkg_find () {
     #https://github.com/koalaman/shellcheck/wiki/SC2207
     IFS=" " read -r -a find <<< "$(tr ' ' '\n' <<< "${find[@]}" | sort -u | tr '\n' ' ')"
     
-    #Check if array is not empty
+    #Search for the given package
     if [ "${#find[@]}" != "0" ]; then
     
-        #Search for the given package
         for i in $CORE_PACKAGES $PACKAGES $BOOTLOADER_PACKAGES $DISPLAY_MANAGER $DE_PACKAGES $DE_DEPENDENT_PACKAGES $AUR_PACKAGES $SELECTED_GREETER $SELECTED_VIDEO_DRIVER; do
         
             for j in "${find[@]}"; do
@@ -519,7 +518,7 @@ function pkg_find () {
 
 #A space must be put before adding it to the package set
 #i.e. syntax should be: foo+=" bar"
-function pkg_specific () {
+function pkg_specific_operations () {
 
     pkg_find "$@"
     
@@ -1732,7 +1731,7 @@ echo
 select_one "Available driver packages are:" "$VIDEO_DRIVER" "$VIDEO_DRIVER_AUR"
 SELECTED_VIDEO_DRIVER="$SELECTION"
 
-pkg_specific $PKG_SPECIFIC
+pkg_specific_operations $PKG_SPECIFIC_OPERATIONS
 
 print_packages
 
