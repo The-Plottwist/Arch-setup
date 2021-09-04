@@ -22,7 +22,8 @@
 
 
 #Auto partitioning wipes hard disk entirely, therefore it is disabled by default.
-#To enable at your own risk, uncomment the below line
+#To enable, uncomment the below line
+#Remember, it is at your own risk!
 #declare ENABLE_AUTO_PARTITIONING="true"
 
 
@@ -47,8 +48,6 @@ declare MOUNT_PATH=""
 declare GRUB_ARGS=""
 
 declare PARTITION_TABLE=""
-declare DEVICE=""
-declare VOLGROUP=""
 declare DISK=""
 declare DISK_SIZE_TIB=""
 declare DISK_SIZE_MIB=""
@@ -63,17 +62,22 @@ declare SYSTEM_PARTITION=""
 declare HOME_PARTITION=""
 declare SWAP_PARTITION=""
 
-#For performing package specific operations
-#Related funciton is: pkg_specific_operations
+declare KEY_LAYOUT=""
+declare DEVICE=""
+declare VOLGROUP=""
+declare TIMEZONE=""
+declare USER_NAME=""
+declare PASSWORD=""
+
+#It has a function with the same name
 declare PKG_SPECIFIC_OPERATIONS="virtualbox clamav lightdm-slick-greeter"
 
 # ---------------------------- Packages To Install --------------------------- #
 
 declare CORE_PACKAGES="base linux linux-firmware"
 
-#Warning: Do not delete nano! it is used in the script.
 #Warning: This variable is also modified from the pkg_specific_operations function!
-declare PACKAGES="os-prober lvm2 sudo base-devel screen git python python-pip cpupower thermald dhcpcd dhclient flatpak parted htop lshw man-db man-pages texinfo mc nano net-tools network-manager-applet networkmanager nm-connection-editor ntfs-3g pacman-contrib unrar unzip p7zip usbutils wget xdg-user-dirs firefox deluge gimp inkscape keepassxc libreoffice-fresh vlc cups"
+declare PACKAGES="os-prober lvm2 sudo base-devel screen git python python-pip cpupower thermald dhcpcd dhclient flatpak parted htop lshw man-db man-pages texinfo mc net-tools network-manager-applet networkmanager nm-connection-editor ntfs-3g pacman-contrib unrar unzip p7zip usbutils wget xdg-user-dirs firefox deluge gimp inkscape keepassxc libreoffice-fresh vlc cups"
 
 #All additional packages will be asked to user.
 #They will be added to the original set if accepted.
@@ -284,10 +288,9 @@ function yes_no () {
     if [ "$ANSWER" == "N" ]; then ANSWER="n"; fi
 }
 
-#If no arguments passed read it from the user
-#and check the input. If user entered wrongly
-#loop until correct answer has gotten.
-#Else, check the given argument and return a value (if correct 0 - if false 12)
+#If no arguments passed read it from the user and check the input.
+#If user entered wrongly loop until the correct answer has got.
+#Else, check the given argument and return a value (if true return 0 - else return 12)
 function disk_check () {
 
     declare INPUT=""
@@ -322,10 +325,9 @@ function disk_check () {
 }
 
 
-#If no arguments passed read it from the user
-#and check the input. If user entered wrongly
-#loop until correct answer has gotten.
-#Else, check the given argument and return a value (if correct 0 - if false 13)
+#If no arguments passed read it from the user and check the input.
+#If user entered wrongly loop until the correct answer has got.
+#Else, check the given argument and return a value (if true return 0 - else return 13)
 function partition_check () {
 
     declare INPUT=""
@@ -359,10 +361,9 @@ function partition_check () {
 }
 
 
-#If no arguments passed read it from the user
-#and check the input. If user entered wrongly
-#loop until correct answer has gotten.
-#Else, check the given argument and return a value (if correct 0 - if false 14)
+#If no arguments passed read it from the user and check the input.
+#If user entered wrongly loop until the correct answer has got.
+#Else, check the second argument and return a value (if true return 0 - else return 14)
 function number_check () {
 
     declare max_=0
@@ -370,7 +371,7 @@ function number_check () {
     #Max_ cannot be zero nor char
     if output=$([[ ! $1 =~ ^[0-9]+$ ]] || (( $1 == 0 )) ); then
     
-        failure "number_check INTERNAL ERROR! Wrong input received. (\$1: $1) -Revise the code-"
+        failure "number_check: ERROR! Max cannot be zero nor char. (Received value: $1)"
     else
     
         max_=$1
@@ -402,6 +403,29 @@ function number_check () {
     done
 }
 
+#This is similar to "cat -n ... | less" command
+function list {
+
+    declare list=""
+    declare message=""
+    
+    list="$1"
+    message="$2"
+    
+    {
+        declare -i n=0
+    
+        printf "$message\n"
+        printf "${LIGHT_RED}(q: Quit from listing, /: search forward, ?: search backward, h: Help, Navigation: ↑↓, pg-up, pg-down)\n\n"
+        
+        for i in $list; do
+    
+            n+=1
+            printf "${LIGHT_CYAN}%s ${NOCOLOUR}" "$n"
+            printf "${PURPLE}%s${NOCOLOUR}\n" "$i"
+        done
+    } | less --raw-control-chars
+}
 
 function print_packages () {
 
@@ -896,8 +920,8 @@ function aur () {
             prompt_info "Activating $SELECTED_GREETER..."
             if [ -n "$LIGHTDM_CONF" ]; then
             
-                prompt_info "Backing up /etc/lightdm/lightdm.conf to /etc/lightdm/lightdm.conf.backup..."
-                mv /etc/lightdm/lightdm.conf /etc/lightdm/lightdm.conf.backup
+                prompt_info "Backing up /etc/lightdm/lightdm.conf to /etc/lightdm/lightdm.conf.bak..."
+                mv /etc/lightdm/lightdm.conf /etc/lightdm/lightdm.conf.bak
                 echo "$LIGHTDM_CONF" > /etc/lightdm/lightdm.conf
             else
             
@@ -1074,32 +1098,77 @@ prompt_info "
 "
 
 #Disclaimer
-prompt_different "This script is for installing archlinux on an empty (or semi-empty) disk and assumes you have ALREADY SET your keyboard layout."
+prompt_different "This script is for installing archlinux on an empty (or semi-empty) disk."
 echo
 
 prompt_different "You can modify this script to your needs, otherwise XFCE will be installed with a default package set."
 echo
-
-printf "${YELLOW}Keyboard Layout: ${PURPLE}https://wiki.archlinux.org/title/Installation_guide#Set_the_keyboard_layout${NOCOLOUR}"
-echo
 echo
 
-printf "${ORANGE}If you encounter a problem or want to stop the command, you can press Ctrl-C to quit.${NOCOLOUR}\n"
-printf "${ORANGE}Use Ctrl-Z in dire situations and reboot your system afterwards as it doesn't actually stop the script.${NOCOLOUR}\n"
+printf "${ORANGE}If you encounter a problem or want to stop the command, you can press ${LIGHT_CYAN}Ctrl-C${ORANGE} to quit.${NOCOLOUR}\n"
+printf "${ORANGE}Use ${LIGHT_CYAN}Ctrl-Z${ORANGE} in dire situations and reboot your system afterwards as it doesn't actually stop the script.${NOCOLOUR}\n"
 echo
 
 prompt_warning "This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
 without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-See the GNU General Public License V3 for more details."
+See the GNU General Public License for more details."
 echo
 
 #Check the internet connection before attempting anything
 check_connection
 
-#Get device name
+#Keyboard layout
+declare l_layouts=""
+declare iso=""
+declare iso_num=""
+declare iso_max=""
+
+prompt_question "Please enter your country's ISO code to list the available keyboard layouts (ex: fr, de, au) or type 'd' to use the default (US) layout:"
+read -e -r -p " " iso
+
+while true; do
+    
+    if [ "$iso" == "d" ]; then
+    
+        iso="us"
+        break
+    fi
+    
+    l_layouts=$(find /usr/share/kbd/keymaps -type f -name "*.map.gz" -printf "%f\n" | sed "s/.map.gz//g" | grep -i "$iso")
+    
+    if [ -n "$l_layouts" ]; then
+        
+        iso_max=$(echo "$l_layouts" | cat -n | tail -1 | awk '{print $1}')
+        
+        list "$l_layouts" "${LIGHT_GREEN}- Please find your layout in the list -${NOCOLOUR}"
+        
+        prompt_question "Please specify the number of your layout - or type your ISO Code to re-list -:"
+        read -e -r -p " " iso_num
+        
+        if number_check "$iso_max" "$iso_num"; then
+        
+            KEY_LAYOUT=$(echo "$l_layouts" | head -"$iso_num" | tail -1)
+            break
+        fi
+    else
+    
+        echo
+        prompt_warning "No layouts found."
+        prompt_question "Please enter another ISO code or type 'd' to use the default (US) layout."
+        read -e -r -p " " iso
+    fi
+done
+loadkeys "$KEY_LAYOUT"
+
+echo
+echo
+printf "${PURPLE}Your layout is: ${LIGHT_CYAN}%s${NOCOLOUR}" "$KEY_LAYOUT"
+echo
+
+#Device name
 while true; do
 
-    prompt_question "Please enter device name:"
+    prompt_question "Please enter a device name:"
     read -e -r -p " " DEVICE
     prompt_question "Please re-enter:"
     read -e -r -p " " CHECK
@@ -1117,6 +1186,44 @@ while true; do
         echo
     fi
 done
+
+clear
+
+#Timezone
+declare l_timezones=""
+declare max=""
+declare input=""
+
+l_timezones="$(timedatectl list-timezones)"
+max=$(echo "$l_timezones" | cat -n | tail -1 | awk '{print $1}')
+input="r"
+
+while true; do
+
+    if [ "$input" == "r" ]; then
+    
+        list "$l_timezones" "${LIGHT_GREEN}- Please find your timezone in the list -\n${YELLOW}If you're dual booting with Windows, follow this link: ${PURPLE}https://wiki.archlinux.org/title/System_time#UTC_in_Microsoft_Windows${NOCOLOUR}"
+    else
+    
+        if number_check "$max" "$input"; then
+        
+            break
+        else
+        
+            prompt_warning "Wrong Number!"
+        fi
+    fi
+    
+    prompt_question "Please specify the number of your timezone - or type 'r' to re-list -:"
+    read -e -r -p " " input
+done
+
+TIMEZONE=$(echo "$l_timezones" | head -"$NUMBER_CHECK" | tail -1)
+
+echo
+echo
+printf "${PURPLE}Your timezone is: ${LIGHT_CYAN}%s${NOCOLOUR}" "$TIMEZONE"
+echo
 
 #Get Disk
 clear
@@ -1537,7 +1644,7 @@ else #Manual partition selection
         PRINT=$(parted --script "$DISK" "print")
         last_partition=$(echo "$PRINT" | awk '{print $1}' | tail -1)
         
-        clear
+        echo
         echo "$PRINT"
         
         printf "${LIGHT_CYAN}Please specify the number for the Grub parition ${LIGHT_RED}(1mib partition advised)${LIGHT_CYAN}: ${NOCOLOUR}"
@@ -1549,7 +1656,7 @@ else #Manual partition selection
 
     
     #Print the disk
-    clear
+    echo
     lsblk "$DISK" -o +path,partlabel
 
     #Get ESP
@@ -1780,7 +1887,8 @@ for i in {5..0}; do
     sleep 1s
 done
 
-pacstrap "$MOUNT_PATH" $CORE_PACKAGES $PACKAGES $BOOTLOADER_PACKAGES $DISPLAY_MANAGER $DE_PACKAGES $DE_DEPENDENT_PACKAGES
+#Nano is a dependency for the script
+pacstrap "$MOUNT_PATH" nano $CORE_PACKAGES $PACKAGES $BOOTLOADER_PACKAGES $DISPLAY_MANAGER $DE_PACKAGES $DE_DEPENDENT_PACKAGES
 
 #Generate fstab
 prompt_info "Generating fstab..."
@@ -1793,96 +1901,47 @@ genfstab -U "$MOUNT_PATH" >> "$MOUNT_PATH/etc/fstab"
 function setup () {
 
     #Timezone
-    declare LIST=""
-    declare TIMEZONE=""
-    declare -i max=0
-    
-    LIST="$(timedatectl list-timezones)"
-    max=$(echo "$LIST" | cat -n | tail -1 | awk '{print $1}')
-    
-    function list_timezones {
-    
-        {
-
-            printf "${LIGHT_CYAN}Ctrl-C ${LIGHT_RED}will not work hereafter.${NOCOLOUR}"
-            echo
-            printf "${YELLOW}If you're dual booting with Windows, follow this link: ${PURPLE}https://wiki.archlinux.org/title/System_time#UTC_in_Microsoft_Windows${NOCOLOUR}"
-            echo
-            printf "${LIGHT_GREEN}Please find your timezone in the list.${NOCOLOUR}"
-            echo
-            prompt_question "(q: Quit listing mode, /: Search forward, ?: Search backward, h: help; Navigation: ↑↓, pg-up, pg-down)"
-            echo
-            echo
-
-            declare -i n=0
-            for i in $LIST; do
-        
-                n+=1
-                printf "${LIGHT_CYAN}%s ${NOCOLOUR}" "$n"
-                printf "${PURPLE}%s${NOCOLOUR}\n" "$i"
-            done
-        } | less --raw-control-chars
-    }
-    
-    list_timezones
-    declare INPUT=""
-    while true; do
-    
-        prompt_question "Please specify the number of your timezone - Type 'r' to re-list -:"
-        read -e -r -p " " INPUT
-        
-        if [ "$INPUT" == "r" ]; then
-        
-            list_timezones
-        else
-        
-            if number_check "$max" "$INPUT"; then
-            
-                break
-            else
-            
-                prompt_warning "Wrong Number!"
-            fi
-        fi
-    done
-    
-    TIMEZONE=$(echo "$LIST" | head -"$NUMBER_CHECK" | tail -1)
-    
-    echo
-    echo
-    printf "${LIGHT_GREEN}Your timezone is: ${LIGHT_CYAN}%s${NOCOLOUR}" "$TIMEZONE"
-    echo
-    
     prompt_info "Setting timezone..."
     ln -sf /usr/share/zoneinfo/"$TIMEZONE" /etc/localtime
     
     #Locales
-    printf "${LIGHT_GREEN}Please uncomment the needed locales ${LIGHT_RED}(en_US.UTF-8 UTF-8 and YOUR_LOCALE)${LIGHT_GREEN} in the file that is going to open.${NOCOLOUR}\n"
-    prompt_question "(Ctrl-s: Save, Ctrl-x: Quit, Ctrl-g: Help)"
-    prompt_warning "Press enter to continue..."
-    read -e -r -p " " TMP
-    nano /etc/locale.gen
-    clear
+    #TODO: Add this to README (locale change)
+    declare locale=""
+    locale=$(sed "s/#en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/g" /etc/locale.gen)
     
-    prompt_info "Generating locales..."
-    locale-gen
+    if [ -n "$locale" ]; then
     
-    #Locale.conf
-    prompt_info "Making /etc/locale.conf file..."
-    printf "LANG=en_US.UTF-8" > /etc/locale.conf
+        prompt_info "Backing up /etc/locale.gen to /etc/locale.gen.bak..."
+        mv /etc/locale.gen /etc/locale.gen.bak
+        
+        prompt_info "Configuring /etc/locale.gen..."
+        echo "$locale" > /etc/locale.gen
+    else
     
-    #Keymap
-    if [ ! -f /etc/vconsole.conf ]; then
-
-        printf "${LIGHT_GREEN}Please write your keyboard layout in the file that is going to open. ${LIGHT_RED}(ex: KEYMAP=de-latin1)${NOCOLOUR}"
+        prompt_warning "Cannot modify /etc/locale.gen!"
+        prompt_warning "You have to modify it manually."
         echo
-        prompt_question "(Ctrl-s: Save, Ctrl-x: Quit, Ctrl-g: Help)"
+        
+        prompt_different "Just uncomment en_US.UTF-8 UTF-8 and YOUR LOCALE in the file is going to open."
+        echo
+        prompt_question "(Ctrl-S: Save, Ctrl-X: Quit, Ctrl-G: Help)"
         echo
         prompt_warning "Press enter to continue..."
         read -e -r -p " " TMP
-        nano /etc/vconsole.conf
+        
+        nano /etc/locale.gen
         clear
     fi
+    prompt_info "Generating locale(s)..."
+    locale-gen
+    
+    #Locale.conf
+    prompt_info "Generating /etc/locale.conf..."
+    printf "LANG=en_US.UTF-8" > /etc/locale.conf
+    
+    #Keymap
+    prompt_info "Generating /etc/vconsole.conf..."
+    echo "KEYMAP=$KEY_LAYOUT" > /etc/vconsole.conf
 
     #Hostname
     prompt_info "Generating /etc/hostname..."
@@ -1898,25 +1957,25 @@ function setup () {
     
     # --------------------------------- Initramfs -------------------------------- #
     
-    declare MKINITCPIO=""
+    declare mkinitcpio=""
     if [ "$IS_ENCRYPT" == "true" ]; then
     
-        MKINITCPIO=$(sed "s/HOOKS=(base udev autodetect modconf block filesystems keyboard fsck)/HOOKS=(base udev autodetect keyboard keymap consolefont modconf block encrypt lvm2 filesystems resume fsck)/g" /etc/mkinitcpio.conf)
+        mkinitcpio=$(sed "s/HOOKS=(base udev autodetect modconf block filesystems keyboard fsck)/HOOKS=(base udev autodetect keyboard keymap consolefont modconf block encrypt lvm2 filesystems resume fsck)/g" /etc/mkinitcpio.conf)
     else
     
-        MKINITCPIO=$(sed "s/HOOKS=(base udev autodetect modconf block filesystems keyboard fsck)/HOOKS=(base udev autodetect modconf block filesystems keyboard resume fsck)/g" /etc/mkinitcpio.conf)
+        mkinitcpio=$(sed "s/HOOKS=(base udev autodetect modconf block filesystems keyboard fsck)/HOOKS=(base udev autodetect modconf block filesystems keyboard resume fsck)/g" /etc/mkinitcpio.conf)
     fi
     
-    #Flexibility for read/write operations
+    #Wait for read/write operations
     sleep 1s
     
-    if [ -n "$MKINITCPIO" ]; then
+    if [ -n "$mkinitcpio" ]; then
     
-        prompt_info "Backing up /etc/mkinitcpio.conf to /etc/mkinitcpio.conf.backup..."
-        mv /etc/mkinitcpio.conf /etc/mkinitcpio.conf.backup
+        prompt_info "Backing up /etc/mkinitcpio.conf to /etc/mkinitcpio.conf.bak..."
+        mv /etc/mkinitcpio.conf /etc/mkinitcpio.conf.bak
         
         prompt_info "Configuring /etc/mkinitcpio.conf..."
-        echo "$MKINITCPIO" > /etc/mkinitcpio.conf
+        echo "$mkinitcpio" > /etc/mkinitcpio.conf
     else
     
         prompt_warning "Cannot modify /etc/mkinitcpio.conf!"
@@ -1931,7 +1990,9 @@ function setup () {
         
         prompt_different "Needed format appended to the file."
         echo
-        prompt_different "Just add '#' to the begining of the first 'HOOKS=...' line."
+        printf "${LIGHT_GREEN}Just add '#' to the begining of the first ${LIGHT_RED}'HOOKS=...' ${LIGHT_GREEN}line.${NOCOLOUR}"
+        echo
+        prompt_question "(Ctrl-S: Save, Ctrl-X: Quit, Ctrl-G: Help)"
         echo
         prompt_warning "Press enter to continue..."
         read -e -r -p " " TMP
@@ -1962,13 +2023,13 @@ function setup () {
         CMDLINE=$(sed "s|GRUB_CMDLINE_LINUX=\"\"|GRUB_CMDLINE_LINUX=\"resume=$SWAP_UUID\"|g" /etc/default/grub)
     fi
     
-    #Flexibility for read/write operations
+    #Wait for read/write operations
     sleep 1s
     
     if [ -n "$CMDLINE" ]; then
             
-        prompt_info "Backing up /etc/default/grub to /etc/default/grub.backup..."
-        mv /etc/default/grub /etc/default/grub.backup
+        prompt_info "Backing up /etc/default/grub to /etc/default/grub.bak..."
+        mv /etc/default/grub /etc/default/grub.bak
         
         prompt_info "Configuring /etc/default/grub..."
         echo "$CMDLINE" > /etc/default/grub
@@ -1986,7 +2047,10 @@ function setup () {
         fi
         
         prompt_different "Needed format appended to the file.\n"
-        printf "${LIGHT_GREEN}Just add '#' to the beginning of the first ${LIGHT_RED}'GRUB_CMDLINE_LINUX='${LIGHT_GREEN} line.${NOCOLOUR}\n"
+        printf "${LIGHT_GREEN}Just add '#' to the beginning of the first ${LIGHT_RED}'GRUB_CMDLINE_LINUX='${LIGHT_GREEN} line.${NOCOLOUR}"
+        echo
+        prompt_question "(Ctrl-S: Save, Ctrl-X: Quit, Ctrl-G: Help)"
+        echo
         prompt_warning "Press enter to continue..."
         read -e -r -p " " TMP
         
@@ -2003,8 +2067,8 @@ function setup () {
         sleep 1s
     done
     
-    #Enable sudo group
-    prompt_info "Enabling sudo group..."
+    #Enable sudo
+    prompt_info "Enabling sudo..."
     declare SUDOERS=""
     SUDOERS=$(sed "s/# %sudo/%sudo/g" /etc/sudoers)
     
@@ -2012,15 +2076,18 @@ function setup () {
     
     if [ -n "$SUDOERS" ]; then
         
-        prompt_info "Backing up /etc/sudoers to /etc/sudoers.backup"
-        mv /etc/sudoers /etc/sudoers.backup
+        prompt_info "Backing up /etc/sudoers to /etc/sudoers.bak"
+        mv /etc/sudoers /etc/sudoers.bak
         echo "$SUDOERS" > /etc/sudoers
     else
     
         prompt_warning "Cannot modify /etc/sudoers!"
         prompt_warning "You have to modify it manually."
         
-        echo "${LIGHT_GREEN}Just delete the '#' ${LIGHT_RED}'# %sudo...'${LIGHT_GREEN} line.${NOCOLOUR}"
+        printf "${LIGHT_GREEN}Just delete the '#' ${LIGHT_RED}'# %sudo...'${LIGHT_GREEN} line.${NOCOLOUR}"
+        echo
+        prompt_question "(Ctrl-S: Save, Ctrl-X: Quit, Ctrl-G: Help)"
+        echo
         prompt_warning "Press enter to continue..."
         read -e -r -p " " TMP
         
@@ -2074,20 +2141,21 @@ function setup () {
     printf "%s" "$USER_NAME" > "$TMP_FILE"
 }
 
-#Script cannot make a tmp file in the freaking /tmp directory (couldn't find an elegant solution)
+#The Script cannot make a tmp file in the freaking /tmp directory (couldn't find an elegant solution)
 #The X's are replaced randomly
 declare TMP_FILE=""
 TMP_FILE="/bin/$(mktemp -u XXXXXXXXXXXX)"
 
 #Export variables to be able to use in chroot
+export KEY_LAYOUT="$KEY_LAYOUT"
+export DEVICE="$DEVICE"
+export VOLGROUP="$VOLGROUP"
 export NUMBER_CHECK="$NUMBER_CHECK"
 export ANSWER="$ANSWER"
-export DEVICE="$DEVICE"
 export IS_ENCRYPT="$IS_ENCRYPT"
 export DISK="$DISK"
 export ENCRYPT_PARTITION="$ENCRYPT_PARTITION"
 export SWAP_PARTITION="$SWAP_PARTITION"
-export VOLGROUP="$VOLGROUP"
 export GRUB_ARGS="$GRUB_ARGS"
 export TMP_FILE="$TMP_FILE"
 
@@ -2097,6 +2165,8 @@ export LIGHT_RED="$LIGHT_RED"
 export LIGHT_CYAN="$LIGHT_CYAN"
 export LIGHT_GREEN="$LIGHT_GREEN"
 export NOCOLOUR="$NOCOLOUR"
+
+export TIMEZONE="$TIMEZONE"
 
 #Export functions to be able to use in chroot
 export -f number_check
