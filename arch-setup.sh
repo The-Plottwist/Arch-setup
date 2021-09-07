@@ -67,7 +67,8 @@ declare DEVICE=""
 declare VOLGROUP=""
 declare TIMEZONE=""
 declare USER_NAME=""
-declare PASSWORD=""
+declare USER_PASS=""
+declare ROOT_PASS=""
 
 #It has a function with the same name
 declare PKG_SPECIFIC_OPERATIONS="virtualbox clamav lightdm-slick-greeter"
@@ -139,7 +140,6 @@ function clean_up () {
     echo
     prompt_warning "Signal received..."
     
-    rm -f "$MOUNT_PATH$TMP_FILE" &> /dev/null
     rm -f "/tmp/$PROGRAM_NAME.lock"
     
     Umount_
@@ -255,7 +255,6 @@ function Umount_ () {
 
 function Exit_ () {
 
-    rm -f "$MOUNT_PATH$TMP_FILE" &> /dev/null
     rm -f "/tmp/$PROGRAM_NAME.lock"
 
     Umount_
@@ -288,87 +287,86 @@ function yes_no () {
     if [ "$ANSWER" == "N" ]; then ANSWER="n"; fi
 }
 
-#If no arguments passed read it from the user and check the input.
+# ------------------------------ Check Functions ----------------------------- #
+#Principle:
+#If no arguments passed, read it from the user and check the input.
 #If user entered wrongly loop until the correct answer has got.
-#Else, check the given argument and return a value (if true return 0 - else return 12)
+#Otherwise, check the given argument and if false return a value
+
 function disk_check () {
 
-    declare INPUT=""
-    declare IS_ARGUMENT=""
+    declare input=""
+    declare is_argument=""
     
     if [ -n "$1" ]; then
     
-        IS_ARGUMENT="true"
-        INPUT="$1"
+        is_argument="true"
+        input="$1"
     else
         
-        IS_ARGUMENT="false"
-        read -e -r -p " " INPUT
+        is_argument="false"
+        read -e -r -p " " input
     fi
     
 
     #Use awk to remove unnecessary spaces
-    while ! output=$(lsblk -o type,path | awk '{print $1,$2}'| grep -x "disk $INPUT"); do
+    while ! output=$(lsblk -o type,path | awk '{print $1,$2}'| grep -x "disk $input"); do
     
-        if [ "$IS_ARGUMENT" == "false" ]; then
+        if [ "$is_argument" == "false" ]; then
             
-            prompt_warning "The disk '$INPUT' couldn't found."
+            echo
+            prompt_warning "The disk '$input' couldn't found."
             printf "${LIGHT_RED}Please try again: ${NOCOLOUR}"
-            read -e -r -p " " INPUT
+            read -e -r -p " " input
         else
         
             return 12
         fi
     done
 
-   DISK_CHECK="$INPUT"
+   DISK_CHECK="$input"
 }
 
 
-#If no arguments passed read it from the user and check the input.
-#If user entered wrongly loop until the correct answer has got.
-#Else, check the given argument and return a value (if true return 0 - else return 13)
 function partition_check () {
 
-    declare INPUT=""
-    declare IS_ARGUMENT=""
+    declare input=""
+    declare is_argument=""
     
     if [ -n "$1" ]; then
     
-        IS_ARGUMENT="true"
-        INPUT="$1"
+        is_argument="true"
+        input="$1"
     else
         
-        IS_ARGUMENT="false"
-        read -e -r -p " " INPUT
+        is_argument="false"
+        read -e -r -p " " input
     fi
 
     #Use awk to remove unnecessary spaces
-    while ! output=$(lsblk -o type,path "$DISK" | awk '{print $1,$2}' | grep -v "disk" | grep "$INPUT"); do
+    while ! output=$(lsblk -o type,path "$DISK" | awk '{print $1,$2}' | grep -v "disk" | grep "$input"); do
     
-        if [ "$IS_ARGUMENT" == "false" ]; then
-            
-            prompt_warning "Partition '$INPUT' couldn't found."
+        if [ "$is_argument" == "false" ]; then
+        
+            echo
+            prompt_warning "Partition '$input' couldn't found."
             printf "${LIGHT_RED}Please try again: ${NOCOLOUR}"
-            read -e -r -p " " INPUT
+            read -e -r -p " " input
         else
         
             return 13
         fi
     done
 
-   PART_CHECK="$INPUT"
+   PART_CHECK="$input"
 }
 
 
-#If no arguments passed read it from the user and check the input.
-#If user entered wrongly loop until the correct answer has got.
-#Else, check the second argument and return a value (if true return 0 - else return 14)
 function number_check () {
 
     declare max_=0
     
-    #Max_ cannot be zero nor char
+    #max_ cannot be zero nor char
     if output=$([[ ! $1 =~ ^[0-9]+$ ]] || (( $1 == 0 )) ); then
     
         failure "number_check: ERROR! Max cannot be zero nor char. (Received value: $1)"
@@ -378,21 +376,22 @@ function number_check () {
     fi
     
     
-    declare IS_ARGUMENT=""
+    declare is_argument=""
     if [ -n "$2" ]; then
     
-        IS_ARGUMENT="true"
+        is_argument="true"
         NUMBER_CHECK="$2"
     else
         
-        IS_ARGUMENT="false"
+        is_argument="false"
         read -e -r -p " " NUMBER_CHECK
     fi
     
     while output=$( [[ ! $NUMBER_CHECK =~ ^[0-9]+$ ]] || (( NUMBER_CHECK > max_ )) || (( NUMBER_CHECK == 0 )) ); do
     
-        if [ "$IS_ARGUMENT" == "false" ]; then
+        if [ "$is_argument" == "false" ]; then
             
+            echo
             prompt_warning "Wrong number!"
             prompt_question "Please re-enter:"
             read -e -r -p " " NUMBER_CHECK
@@ -930,7 +929,7 @@ function aur () {
                 printf "${LIGHT_RED}greeter-session=example-gtk-gnome ${LIGHT_GREEN}should be equal to ${LIGHT_RED}greeter_session=$SELECTED_GREETER ${LIGHT_GREEN}-which is under the [Seat:*] section-${NOCOLOUR}"
                 
                 prompt_warning "Press enter to continue..."
-                read -e -r -p " " TMP
+                read -e -r -p " " tmp_key
             fi
         else
         
@@ -940,7 +939,7 @@ function aur () {
             printf "${LIGHT_RED}greeter-session=example-gtk-gnome ${LIGHT_GREEN}should be equal to ${LIGHT_RED}greeter_session=$SELECTED_GREETER ${LIGHT_GREEN}-which is under the [Seat:*] section-${NOCOLOUR}"
             
             prompt_warning "Press enter to continue..."
-            read -e -r -p " " TMP
+            read -e -r -p " " tmp_key
         fi
         
         printf "${YELLOW}For troubleshooting about lightdm, follow this link: ${PURPLE}https://wiki.archlinux.org/title/LightDM#Troubleshooting${NOCOLOUR}\n\n"
@@ -1120,74 +1119,153 @@ check_connection
 #Keyboard layout
 declare l_layouts=""
 declare iso=""
-declare iso_num=""
 declare iso_max=""
 
-prompt_question "Please enter your country's ISO code to list the available keyboard layouts (ex: fr, de, au) or type 'd' to use the default (US) layout:"
-read -e -r -p " " iso
-
 while true; do
+
+    prompt_question "Please enter an ISO code to list the available keyboard layouts (ex: fr, de, au) or type 'd' to use the default (US) layout:"
+    read -e -r -p " " iso
     
-    if [ "$iso" == "d" ]; then
-    
-        iso="us"
-        break
-    fi
-    
-    l_layouts=$(find /usr/share/kbd/keymaps -type f -name "*.map.gz" -printf "%f\n" | sed "s/.map.gz//g" | grep -i "$iso")
-    
-    if [ -n "$l_layouts" ]; then
+    while true; do
         
-        iso_max=$(echo "$l_layouts" | cat -n | tail -1 | awk '{print $1}')
+        if [ "$iso" == "d" ]; then
         
-        list "$l_layouts" "${LIGHT_GREEN}- Please find your layout in the list -${NOCOLOUR}"
-        
-        prompt_question "Please specify the number of your layout - or type your ISO Code to re-list -:"
-        read -e -r -p " " iso_num
-        
-        if number_check "$iso_max" "$iso_num"; then
-        
-            KEY_LAYOUT=$(echo "$l_layouts" | head -"$iso_num" | tail -1)
+            KEY_LAYOUT="us"
             break
         fi
+        
+        l_layouts=$(find /usr/share/kbd/keymaps -type f -name "*.map.gz" -printf "%f\n" | sed "s/.map.gz//g" | grep -i "$iso")
+        
+        if [ -n "$l_layouts" ]; then
+            
+            iso_max=$(echo "$l_layouts" | cat -n | tail -1 | awk '{print $1}')
+            
+            list "$l_layouts" "${LIGHT_GREEN}- Please find your layout in the list -${NOCOLOUR}"
+            
+            prompt_question "Please specify the number of your layout or type an ISO code to re-list:"
+            read -e -r -p " " iso
+            
+            if number_check "$iso_max" "$iso"; then
+            
+                KEY_LAYOUT=$(echo "$l_layouts" | head -"$iso" | tail -1)
+                break
+            fi
+        else
+        
+            echo
+            prompt_warning "No layouts found."
+            prompt_question "Please enter another ISO code or type 'd' to use the default (US) layout:"
+            read -e -r -p " " iso
+        fi
+    done
+    loadkeys "$KEY_LAYOUT"
+    
+    prompt_question "Do you want to test your layout?:"
+    yes_no
+    if [ "$ANSWER" == "y" ]; then
+    
+        declare tmp_file=""
+        tmp_file="$(mktemp /tmp/Layout_test.XXXXXXXXXX)"
+        
+        {
+            echo "# This is a temporary file for testing your layout."
+            echo "# Your layout is '$KEY_LAYOUT'"
+            echo
+            echo "# You can save with Ctrl-S,"
+            echo "# quit with Ctrl-X,"
+            echo "# and open the manual with Ctrl-G."
+        } > "$tmp_file"
+        
+        nano "$tmp_file"
+    fi
+    
+    printf "${LIGHT_CYAN}Do you want to use another layout? (Current layout: ${LIGHT_RED}$KEY_LAYOUT${LIGHT_CYAN}):${NOCOLOUR}"
+    yes_no
+    
+    if [ "$ANSWER" == "n" ]; then
+    
+        break
+    fi
+done
+
+
+#Device name
+prompt_question "Please enter a device name:"
+read -e -r -p " " DEVICE
+VOLGROUP="$DEVICE"VolGroup
+while ! { useradd "$VOLGROUP" &> /dev/null; }; do
+
+    echo
+    prompt_warning "Invalid device name!"
+    prompt_question "Please re-enter:"
+    read -e -r -p " " DEVICE
+    VOLGROUP="$DEVICE"VolGroup
+done
+userdel "$VOLGROUP"
+
+MOUNT_PATH="$HOME/INSTALL/$DEVICE"
+mkdir -p "$MOUNT_PATH"
+
+echo
+
+#User name
+prompt_question "Please enter a user name:"
+read -e -r -p " " USER_NAME
+while ! { useradd "$USER_NAME" &> /dev/null; }; do
+
+    echo
+    prompt_warning "Invalid user name!"
+    prompt_question "Please re-enter:"
+    read -e -r -p " " USER_NAME
+done
+userdel "$USER_NAME"
+
+echo
+
+#User pass
+while true; do
+
+    declare check=""
+
+    prompt_question "Please enter a password for user $USER_NAME:"
+    read -s -e -r -p " " USER_PASS
+    
+    prompt_question "Please re-enter:"
+    read -s -e -r -p " " check
+    
+    if [ "$USER_PASS" == "$check" ]; then
+    
+        break
     else
     
         echo
-        prompt_warning "No layouts found."
-        prompt_question "Please enter another ISO code or type 'd' to use the default (US) layout."
-        read -e -r -p " " iso
+        prompt_warning "Passwords don't match!"
     fi
 done
-loadkeys "$KEY_LAYOUT"
 
 echo
-echo
-printf "${PURPLE}Your layout is: ${LIGHT_CYAN}%s${NOCOLOUR}" "$KEY_LAYOUT"
-echo
 
-#Device name
+#Root pass
 while true; do
 
-    prompt_question "Please enter a device name:"
-    read -e -r -p " " DEVICE
+    check=""
+
+    prompt_question "Please enter a password for root:"
+    read -s -e -r -p " " ROOT_PASS
+    
     prompt_question "Please re-enter:"
-    read -e -r -p " " CHECK
-
-    if [ "$DEVICE" == "$CHECK" ]; then
-
-        VOLGROUP="$DEVICE"VolGroup
-        MOUNT_PATH="$HOME/INSTALL/$DEVICE"
-
-        mkdir -p "$MOUNT_PATH"
+    read -s -e -r -p " " check
+    
+    if [ "$ROOT_PASS" == "$check" ]; then
+    
         break
     else
-
-        prompt_warning "Names don't match!"
+    
         echo
+        prompt_warning "Passwords don't match!"
     fi
 done
 
-clear
 
 #Timezone
 declare l_timezones=""
@@ -1224,6 +1302,7 @@ echo
 echo
 printf "${PURPLE}Your timezone is: ${LIGHT_CYAN}%s${NOCOLOUR}" "$TIMEZONE"
 echo
+
 
 #Get Disk
 clear
@@ -1598,10 +1677,10 @@ else #Manual partition selection
     echo
 
     #Look for LUKS partitions
-    declare LUKS=""
-    LUKS=$(lsblk "$DISK" -o path,fstype | grep "crypto_LUKS" | awk '{print $1}')
+    declare luks=""
+    luks=$(lsblk "$DISK" -o path,fstype | grep "crypto_LUKS" | awk '{print $1}')
 
-    if [ -n "$LUKS" ]; then
+    if [ -n "$luks" ]; then
 
         declare -i current_=0
     
@@ -1610,11 +1689,11 @@ else #Manual partition selection
         echo
         prompt_info "LUKS partitions found!"
         printf "\033[1A"
-        prompt_different "$LUKS"
+        prompt_different "$luks"
         echo
         echo
     
-        for i in $LUKS; do
+        for i in $luks; do
     
             prompt_question "Do you want to open $i (y/n):"
             yes_no
@@ -1639,13 +1718,13 @@ else #Manual partition selection
     if output=$([ "$PARTITION_TABLE" == "gpt" ] && [ "$IS_UEFI" == "false" ]); then
     
         declare -i last_partition=0
-        declare PRINT=""
+        declare print=""
         
-        PRINT=$(parted --script "$DISK" "print")
-        last_partition=$(echo "$PRINT" | awk '{print $1}' | tail -1)
+        print=$(parted --script "$DISK" "print")
+        last_partition=$(echo "$print" | awk '{print $1}' | tail -1)
         
         echo
-        echo "$PRINT"
+        echo "$print"
         
         printf "${LIGHT_CYAN}Please specify the number for the Grub parition ${LIGHT_RED}(1mib partition advised)${LIGHT_CYAN}: ${NOCOLOUR}"
         number_check "$last_partition"
@@ -1927,7 +2006,7 @@ function setup () {
         prompt_question "(Ctrl-S: Save, Ctrl-X: Quit, Ctrl-G: Help)"
         echo
         prompt_warning "Press enter to continue..."
-        read -e -r -p " " TMP
+        read -e -r -p " " tmp_key
         
         nano /etc/locale.gen
         clear
@@ -1955,9 +2034,11 @@ function setup () {
         printf "127.0.1.1      %s.localdomain    %s" "$DEVICE" "$DEVICE"
     } >> /etc/hosts
     
+    
     # --------------------------------- Initramfs -------------------------------- #
     
     declare mkinitcpio=""
+    
     if [ "$IS_ENCRYPT" == "true" ]; then
     
         mkinitcpio=$(sed "s/HOOKS=(base udev autodetect modconf block filesystems keyboard fsck)/HOOKS=(base udev autodetect keyboard keymap consolefont modconf block encrypt lvm2 filesystems resume fsck)/g" /etc/mkinitcpio.conf)
@@ -1995,7 +2076,7 @@ function setup () {
         prompt_question "(Ctrl-S: Save, Ctrl-X: Quit, Ctrl-G: Help)"
         echo
         prompt_warning "Press enter to continue..."
-        read -e -r -p " " TMP
+        read -e -r -p " " tmp_key
         
         nano /etc/mkinitcpio.conf
         clear
@@ -2007,32 +2088,33 @@ function setup () {
     grub-install $GRUB_ARGS
     
     #Configure grub
-    declare CMDLINE=""
+    declare cmdline=""
+    
     if [ "$IS_ENCRYPT" == "true" ]; then
     
-        declare ENCRYPT_UUID=""
-        ENCRYPT_UUID=$(blkid "$ENCRYPT_PARTITION" | awk '{print $2}' | sed s/\"//g)
+        declare encrypt_uuid=""
+        encrypt_uuid=$(blkid "$ENCRYPT_PARTITION" | awk '{print $2}' | sed s/\"//g)
         
-        CMDLINE=$(sed "s|GRUB_CMDLINE_LINUX=\"\"|GRUB_CMDLINE_LINUX=\"cryptdevice=$ENCRYPT_UUID:cryptlvm root=/dev/$VOLGROUP/root resume=/dev/$VOLGROUP/swap\"|g" /etc/default/grub)
+        cmdline=$(sed "s|GRUB_CMDLINE_LINUX=\"\"|GRUB_CMDLINE_LINUX=\"cryptdevice=$encrypt_uuid:cryptlvm root=/dev/$VOLGROUP/root resume=/dev/$VOLGROUP/swap\"|g" /etc/default/grub)
     else
         
         #For hibernation
-        declare SWAP_UUID=""
-        SWAP_UUID=$(blkid "$SWAP_PARTITION" | awk '{print $2}' | sed s/\"//g)
+        declare swap_uuid=""
+        swap_uuid=$(blkid "$SWAP_PARTITION" | awk '{print $2}' | sed s/\"//g)
         
-        CMDLINE=$(sed "s|GRUB_CMDLINE_LINUX=\"\"|GRUB_CMDLINE_LINUX=\"resume=$SWAP_UUID\"|g" /etc/default/grub)
+        cmdline=$(sed "s|GRUB_CMDLINE_LINUX=\"\"|GRUB_CMDLINE_LINUX=\"resume=$swap_uuid\"|g" /etc/default/grub)
     fi
     
     #Wait for read/write operations
     sleep 1s
     
-    if [ -n "$CMDLINE" ]; then
+    if [ -n "$cmdline" ]; then
             
         prompt_info "Backing up /etc/default/grub to /etc/default/grub.bak..."
         mv /etc/default/grub /etc/default/grub.bak
         
         prompt_info "Configuring /etc/default/grub..."
-        echo "$CMDLINE" > /etc/default/grub
+        echo "$cmdline" > /etc/default/grub
     else
     
         prompt_warning "Cannot modify /etc/default/grub!"
@@ -2040,10 +2122,10 @@ function setup () {
         
         if [ "$IS_ENCRYPT" == "true" ]; then
             
-            echo "GRUB_CMDLINE_LINUX=\"cryptdevice=$ENCRYPT_UUID:cryptlvm root=/dev/$VOLGROUP/root resume=/dev/$VOLGROUP/swap\"" >> /etc/default/grub
+            echo "GRUB_CMDLINE_LINUX=\"cryptdevice=$encrypt_uuid:cryptlvm root=/dev/$VOLGROUP/root resume=/dev/$VOLGROUP/swap\"" >> /etc/default/grub
         else
         
-            echo "GRUB_CMDLINE_LINUX=\"resume=$SWAP_UUID\"" >> /etc/default/grub
+            echo "GRUB_CMDLINE_LINUX=\"resume=$swap_uuid\"" >> /etc/default/grub
         fi
         
         prompt_different "Needed format appended to the file.\n"
@@ -2052,7 +2134,7 @@ function setup () {
         prompt_question "(Ctrl-S: Save, Ctrl-X: Quit, Ctrl-G: Help)"
         echo
         prompt_warning "Press enter to continue..."
-        read -e -r -p " " TMP
+        read -e -r -p " " tmp_key
         
         nano /etc/default/grub
         clear
@@ -2069,16 +2151,16 @@ function setup () {
     
     #Enable sudo
     prompt_info "Enabling sudo..."
-    declare SUDOERS=""
-    SUDOERS=$(sed "s/# %sudo/%sudo/g" /etc/sudoers)
+    declare sudoers=""
+    sudoers=$(sed "s/# %sudo/%sudo/g" /etc/sudoers)
     
     sleep 1s
     
-    if [ -n "$SUDOERS" ]; then
+    if [ -n "$sudoers" ]; then
         
         prompt_info "Backing up /etc/sudoers to /etc/sudoers.bak"
         mv /etc/sudoers /etc/sudoers.bak
-        echo "$SUDOERS" > /etc/sudoers
+        echo "$sudoers" > /etc/sudoers
     else
     
         prompt_warning "Cannot modify /etc/sudoers!"
@@ -2089,75 +2171,40 @@ function setup () {
         prompt_question "(Ctrl-S: Save, Ctrl-X: Quit, Ctrl-G: Help)"
         echo
         prompt_warning "Press enter to continue..."
-        read -e -r -p " " TMP
+        read -e -r -p " " tmp_key
         
         nano /etc/sudoers
         clear
     fi
     groupadd sudo
 
-    clear
-
-    #Add user
-    declare USER_NAME=""
-    declare CHECK=""
-    while true; do
+    #User
+    prompt_info "Adding user..."
+    useradd --password "$USER_PASS" -m -G sudo "$USER_NAME"
     
-        prompt_question "Enter a name for new user:"
-        read -e -r -p " " USER_NAME
-        
-        prompt_question "Please re-enter:"
-        read -e -r -p " " CHECK
-        
-        if [ "$USER_NAME" == "$CHECK" ]; then
-        
-            useradd -m -G sudo "$USER_NAME" && break
-            prompt_warning "User name is not suitable!"
-        else
-    
-            echo
-            prompt_warning "Names don't match!"
-            echo
-        fi
-    done
-
-    while ! passwd "$USER_NAME"; do
-
-        prompt_warning "Try again."
-    done
-    
-    echo
-    
-    #Set root password
-    printf "${LIGHT_RED}Root ${NOCOLOUR}"
-    while ! passwd root; do
-
-        prompt_warning "Try again."
-        printf "${LIGHT_RED}Root ${NOCOLOUR}"
-    done
-
-    prompt_warning "Installation complete!"
-    
-    printf "%s" "$USER_NAME" > "$TMP_FILE"
+    #Root
+    prompt_info "Changing root pass..."
+    echo "root:$ROOT_PASS" | chpasswd
 }
 
-#The Script cannot make a tmp file in the freaking /tmp directory (couldn't find an elegant solution)
-#The X's are replaced randomly
-declare TMP_FILE=""
-TMP_FILE="/bin/$(mktemp -u XXXXXXXXXXXX)"
-
 #Export variables to be able to use in chroot
+export USER_NAME="$USER_NAME"
+export USER_PASS="$USER_PASS"
+export ROOT_PASS="$ROOT_PASS"
 export KEY_LAYOUT="$KEY_LAYOUT"
+export TIMEZONE="$TIMEZONE"
+
 export DEVICE="$DEVICE"
 export VOLGROUP="$VOLGROUP"
-export NUMBER_CHECK="$NUMBER_CHECK"
-export ANSWER="$ANSWER"
-export IS_ENCRYPT="$IS_ENCRYPT"
+
 export DISK="$DISK"
+export IS_ENCRYPT="$IS_ENCRYPT"
 export ENCRYPT_PARTITION="$ENCRYPT_PARTITION"
 export SWAP_PARTITION="$SWAP_PARTITION"
 export GRUB_ARGS="$GRUB_ARGS"
-export TMP_FILE="$TMP_FILE"
+
+export NUMBER_CHECK="$NUMBER_CHECK"
+export ANSWER="$ANSWER"
 
 export YELLOW="$YELLOW"
 export PURPLE="$PURPLE"
@@ -2165,8 +2212,6 @@ export LIGHT_RED="$LIGHT_RED"
 export LIGHT_CYAN="$LIGHT_CYAN"
 export LIGHT_GREEN="$LIGHT_GREEN"
 export NOCOLOUR="$NOCOLOUR"
-
-export TIMEZONE="$TIMEZONE"
 
 #Export functions to be able to use in chroot
 export -f number_check
@@ -2179,11 +2224,6 @@ export -f prompt_different
 export -f setup
 
 arch-chroot "$MOUNT_PATH" /bin/bash -c "setup"
-
-#Assign User_name
-declare USER_NAME=""
-USER_NAME=$(cat "$MOUNT_PATH$TMP_FILE")
-rm -f "$MOUNT_PATH$TMP_FILE"
 
 #Setup second phase
 setup-second-phase
