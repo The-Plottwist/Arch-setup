@@ -812,15 +812,13 @@ function post-install () {
 #                                     MAIN                                     #
 # ---------------------------------------------------------------------------- #
 
-#This script assumes keyboard layout has already been set
-
 #Lock file
 if [ -f "/tmp/$PROGRAM_NAME.lock" ]; then
 
     prompt_warning "Another instance is already running!"
-    prompt_warning "If you think this is a mistake, delete /tmp/$PROGRAM_NAME.lock"
+    prompt_warning "If you think this is a mistake, please delete /tmp/$PROGRAM_NAME.lock"
     prompt_warning "Exiting..."
-    exit 1
+    exit 155
 else
 
     touch "/tmp/$PROGRAM_NAME.lock"
@@ -1021,6 +1019,7 @@ while true; do
     fi
 done
 
+clear
 
 #Timezone
 declare l_timezones=""
@@ -1981,6 +1980,7 @@ export -f setup
 #Setup
 arch-chroot "$MOUNT_PATH" /bin/bash -c "setup"
 
+
 #Copy background images
 prompt_info "Copying background images..."
 if [ -d "assets" ]; then
@@ -1994,6 +1994,7 @@ if [ -d "assets" ]; then
         cp assets/Background.png "$MOUNT_PATH/usr/share/backgrounds/xfce/xfce-verticals.png"
     fi
 fi
+
 
 #Export additional variables
 export AUR_PACKAGES="$AUR_PACKAGES"
@@ -2066,5 +2067,4 @@ echo
 printf "${LIGHT_GREEN}You can safely reboot now.${NOCOLOUR}"
 echo
 
-#Remove lock
-rm -f "/tmp/$PROGRAM_NAME.lock"
+Exit_
