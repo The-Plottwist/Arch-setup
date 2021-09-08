@@ -501,17 +501,17 @@ function pkg_select () {
 
 function pkg_find () {
 
-    declare find=("$@")
+    declare search=("$@")
 
     #Check if the given package is alredy found
     for i in $PKG_FIND; do
     
-        for j in "${find[@]}"; do
+        for j in "${search[@]}"; do
         
             #Omit
             if [ "$j" == "$i" ]; then
             
-                find=( "${find[@]/$i}" )
+                search=( "${search[@]/$i}" )
             fi
         done
     done
@@ -519,20 +519,20 @@ function pkg_find () {
     #Make values unique
     #https://stackoverflow.com/questions/13648410/how-can-i-get-unique-values-from-an-array-in-bash
     #https://github.com/koalaman/shellcheck/wiki/SC2207
-    IFS=" " read -r -a find <<< "$(tr ' ' '\n' <<< "${find[@]}" | sort -u | tr '\n' ' ')"
+    IFS=" " read -r -a search <<< "$(tr ' ' '\n' <<< "${search[@]}" | sort -u | tr '\n' ' ')"
     
     #Search for the given package
-    if [ "${#find[@]}" != "0" ]; then
+    if [ "${#search[@]}" != "0" ]; then
     
         for i in $CORE_PACKAGES $PACKAGES $BOOTLOADER_PACKAGES $DISPLAY_MANAGER $DE_PACKAGES $DE_DEPENDENT_PACKAGES $AUR_PACKAGES $SELECTED_GREETER $SELECTED_VIDEO_DRIVER; do
         
-            for j in "${find[@]}"; do
+            for j in "${search[@]}"; do
             
                 #Add to the PKG_FIND
                 if [ "$i" == "$j" ]; then
                 
                     PKG_FIND+=" $j"
-                    find=( "${find[@]/$i}" ) #Omit the founded package, thus optimize the search.
+                    search=( "${search[@]/$i}" ) #Omit the founded package, thus optimize the search.
                 fi
             done
         done
