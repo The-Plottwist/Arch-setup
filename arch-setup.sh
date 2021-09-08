@@ -666,212 +666,55 @@ function select_one () {
     done
 }
 
-# ---------------------------------------------------------------------------- #
-#                    Second Phase (Will be used at the end)                    #
-# ---------------------------------------------------------------------------- #
 
-#Generate a file called "setup-second-phase.sh"
-#Warning: Mix use of double quotes ("") and single quotes ('')
-function setup-second-phase () {
+function post-install () {
 
-#Inform the user (still in first phase)
-prompt_info "Generating setup-second-phase.sh..."
-
-#Below is the code of "setup-second-phase.sh"
-{
-
-echo "#!/bin/bash
-
-
-# ---------------------------------------------------------------------------- #
-#                      ! This is an Auto Generated file !                      #
-# ---------------------------------------------------------------------------- #
-
-declare PROGRAM_NAME=\"\"
-PROGRAM_NAME=\"setup-second-phase.sh\"
-
-#Colours for colourful output
-declare LIGHT_RED='\033[1;31m'
-declare YELLOW='\033[1;33m'
-declare PURPLE='\033[0;35m'
-declare LIGHT_GREEN='\033[1;32m'
-declare LIGHT_CYAN='\033[1;36m'
-declare NOCOLOUR='\033[0m' #No Colour
-
-declare MOUNT_PATH=\"$MOUNT_PATH\"
-declare DISK=\"$DISK\"
-
-declare USER_NAME=\"$USER_NAME\"
-declare AUR_PACKAGES=\"$AUR_PACKAGES\"
-declare SELECTED_GREETER=\"$SELECTED_GREETER\"
-declare SERVICES=\"$SERVICES\"
-"
-
-echo '
-# ---------------------------------------------------------------------------- #
-#                                   Functions                                  #
-# ---------------------------------------------------------------------------- #
-
-#Signal handling
-trap clean_up SIGHUP SIGINT SIGTERM
-
-function clean_up () {
-
-    prompt_warning "Signal received!"
-    prompt_warning "Exiting..."
-    Exit_ "155"
-}
-
-function check_connection () {
-
-    { ping wiki.archlinux.org -c 1 &>> /dev/null; } || failure "No internet connection!"
-}
-
-function Umount_ () {
-
-    declare MOUNTPOINTS_U=""
-    declare SWAPS_U=""
-    declare CRYPT_U=""
-    declare LVM_U=""
-    declare LUKS_U=""
-    
-    MOUNTPOINTS_U=$(lsblk -o mountpoints "$DISK" | grep "/" | sort --reverse)
-    SWAPS_U=$(lsblk -o mountpoints,path "$DISK" | grep "\[SWAP\]" | awk '\''{print $2}'\'')
-    CRYPT_U=$(lsblk -o type,path "$DISK")
-    LVM_U=$(echo "$CRYPT_U" | grep -w "lvm" | awk '\''{print $2}'\'')
-    LUKS_U=$(echo "$CRYPT_U" | grep -w "crypt" | awk '\''{print $2}'\'')
-    
-    if output=$([ -n "$MOUNTPOINTS_U" ] && [ -n "$SWAPS_U" ] && [ -n "$CRYPT_U" ] && [ -n "$LVM_U" ] && [ -n "$LUKS_U" ]); then
-    
-        prompt_info "Unmounting please wait..."
-    
-        #Umount
-        if [ -n "$MOUNTPOINTS_U" ]; then
-    
-            for i in $MOUNTPOINTS_U; do
-    
-                   umount "$i"
-            done
-    
-            sleep 3s
-        fi
-    
-        #Swapoff
-        if [ -n "$SWAPS_U" ]; then
-    
-            for i in $SWAPS_U; do
-                    
-                swapoff "$i"
-            done
-    
-            sleep 3s
-        fi
-    
-        #Logical volumes
-        if [ -n "$LVM_U" ]; then
-        
-            for i in $LVM_U; do
-            
-                cryptsetup close "$i"
-            done
-    
-            sleep 3s
-        fi
-    
-        #LUKS partitions
-        if [ -n "$LUKS_U" ]; then
-        
-            for i in $LUKS_U; do
-            
-                cryptsetup close "$i"
-            done
-    
-            sleep 3s
-        fi
-    fi
-
-    #Inform the kernel
-    prompt_info "Informing kernel about partition changes..."
-    partprobe &> /dev/null
-}
-
-function Exit_ () {
-
-    #Umount_
-
-    rm -f "/tmp/$PROGRAM_NAME.lock"
-
-    exit $1
-}
-
-function prompt_warning () {
-
-    printf "${LIGHT_RED}%s${NOCOLOUR}" "$1"
-    echo
-}
-function prompt_info () {
-
-    echo
-    printf "${YELLOW}%s${NOCOLOUR}" "$1"
-    echo
-    echo
-}
-
-function failure () {
-
-    prompt_warning "$1"
-    prompt_warning "Exiting..."
-    Exit_ 1
-}
-
-#The aur function (will be called in chroot)
-function aur () {
-
-    #Make a github directory and clone yay (will be called in user'\''s terminal)
+    #Make a github directory and clone yay (will be called in user's terminal)
     function clone_yay () {
 
         #Generating home directories
-        prompt_info "Generating home directories..."
+        prompt_info "Generating $USER_NAME's home directories..."
         xdg-user-dirs-update
 
         check_connection
 
-        prompt_info "Cloning yay..."
-        cd "/home/$USER_NAME" || failure "Cannot change directory to /home/$USER_NAME"
-        mkdir -p Git-Hub || failure "/home/$USER_NAME/Git-Hub directory couldn'\''t made."
-        cd Git-Hub || failure "Cannot change directory to /home/$USER_NAME/Git-Hub"
+        if ! [ -d "/home/$USER_NAME/Git-Hub/yay" ]; then
 
-        if [ ! -d yay ]; then
-        
+            prompt_info "Cloning yay..."
+            cd "/home/$USER_NAME" || failure "Cannot change directory to /home/$USER_NAME"
+            
+            mkdir -p Git-Hub || failure "/home/$USER_NAME/Git-Hub directory couldn't made."
+            cd Git-Hub || failure "Cannot change directory to /home/$USER_NAME/Git-Hub"
+            
             git clone https://aur.archlinux.org/yay.git || failure "Cannot clone yay."
         fi
     }
 
     #Generating home directories
-    prompt_info "Generating home directories..."
+    prompt_info "Generating 'root' home directories..."
     xdg-user-dirs-update
     
     #Install go for yay
-    prompt_info "Installing go for aur helper... -yay-"
+    prompt_info "Installing go for aur helper..."
     pacman -S --noconfirm go
     
-    #Export variables to use it in the user'\''s shell
+    #Export variables to use it in the user's shell
     export USER_NAME="$USER_NAME"
     
-    #Export functions to call it in the user'\''s shell
+    #Export functions to call it in the user's shell
     export -f clone_yay
     export -f check_connection
 
     #Clone yay
     su "$USER_NAME" /bin/bash -c clone_yay || Exit_ $?
 
-    #Install yay.
+    #Install yay
     prompt_info "Installing yay..."
     cd "/home/$USER_NAME/Git-Hub/yay" || failure "Cannot change directory to /home/$USER_NAME/Git-Hub/yay"
     sudo -u "$USER_NAME" makepkg -si --noconfirm || failure "Error Cannot install yay!"
     
-    #Download pkgbuilds
-    prompt_info "Downloading pkgbuilds..."
+    #Download aur pkgbuilds
+    prompt_info "Downloading aur pkgbuilds..."
     mkdir -p "/home/$USER_NAME/.cache/yay" || failure "Cannot make /home/$USER_NAME/.cache/yay directory!"
     cd "/home/$USER_NAME/.cache/yay" || failure "Cannot change directory to /home/$USER_NAME/.cache/yay"
     yay --getpkgbuild $AUR_PACKAGES || failure "Cannot download pkgbuilds!"
@@ -885,7 +728,7 @@ function aur () {
     for i in *; do
 
         cd "$i"
-        sudo -u "$USER_NAME" makepkg -si --noconfirm
+        echo "$USER_PASS" | sudo -S -u "$USER_NAME" makepkg -si --noconfirm
         cd ..
     done
     
@@ -893,8 +736,7 @@ function aur () {
     #Check if /etc/lightdm.conf exists
     if [ -f "/etc/lightdm/lightdm.conf" ]; then
     
-        # -------------------------------- Background -------------------------------- #
-        
+        #Background
         prompt_info "Arranging login screen background..."
         if output=$([ -f "/usr/share/backgrounds/Login_screen.png" ] && [ "$SELECTED_GREETER" == "lightdm-slick-greeter" ]); then
         
@@ -911,17 +753,17 @@ function aur () {
             
         if pacman -Q "$SELECTED_GREETER"; then
         
-            declare LIGHTDM_CONF=""
-            LIGHTDM_CONF=$(sed "s/#greeter-session=example-gtk-gnome/greeter-session=$SELECTED_GREETER/g" /etc/lightdm/lightdm.conf)
+            declare lightdm_conf=""
+            lightdm_conf=$(sed "s/#greeter-session=example-gtk-gnome/greeter-session=$SELECTED_GREETER/g" /etc/lightdm/lightdm.conf)
             
             sleep 1s
             
             prompt_info "Activating $SELECTED_GREETER..."
-            if [ -n "$LIGHTDM_CONF" ]; then
+            if [ -n "$lightdm_conf" ]; then
             
-                prompt_info "Backing up /etc/lightdm/lightdm.conf to /etc/lightdm/lightdm.conf.bak..."
-                mv /etc/lightdm/lightdm.conf /etc/lightdm/lightdm.conf.bak
-                echo "$LIGHTDM_CONF" > /etc/lightdm/lightdm.conf
+                prompt_info "Backing up /etc/lightdm/lightdm.conf to /etc/lightdm/lightdm.conf.backup..."
+                mv /etc/lightdm/lightdm.conf /etc/lightdm/lightdm.conf.backup
+                echo "$lightdm_conf" > /etc/lightdm/lightdm.conf
             else
             
                 prompt_warning "Cannot modify /etc/lightdm/lightdm.conf file."
@@ -954,107 +796,20 @@ function aur () {
     prompt_info "Enabling services..."
     for i in $SERVICES; do
         
-        systemctl enable $i || { prompt_warning "Cannot enable $i service!"; echo ""; echo "$i" >> "$HOME/disabled_services.txt"; prompt_warning "Service added to $HOME/disabled_services.txt, Please enable it manually."; }
+        systemctl enable "$i" || { prompt_warning "Cannot enable $i service!"; echo ""; echo "$i" >> "$HOME/disabled_services.txt"; prompt_warning "Service added to $HOME/disabled_services.txt, Please enable it manually."; }
     done
 
-    #Generate initramfs
-    prompt_info "Generating initramfs..."
-    mkinitcpio -P
+    #Activate time synchronization
+    prompt_info "Activating time synchronization..."
+    timedatectl set-ntp true
 
-    prompt_warning "AUR configuration complete!"
-}
-
-
-# ---------------------------------------------------------------------------- #
-#                           Second Phase Starts Here                           #
-# ---------------------------------------------------------------------------- #
-
-#Lock file
-if [ -f "/tmp/$PROGRAM_NAME.lock" ]; then
-
-    prompt_warning "Another instance is already running!"
-    prompt_warning "If you think this is a mistake, delete /tmp/$PROGRAM_NAME.lock"
-    prompt_warning "Exiting..."
-    exit 1
-else
-
-    touch "/tmp/$PROGRAM_NAME.lock"
-fi
-
-#Copy background images
-prompt_info "Copying background images..."
-if [ -d "assets" ]; then
-
-    cp assets/Login_screen.png $MOUNT_PATH/usr/share/backgrounds
-    cp assets/Background.png $MOUNT_PATH/usr/share/backgrounds
-
-    #Change xfce'\''s default background
-    if [ -d "$MOUNT_PATH/usr/share/backgrounds/xfce" ]; then
-    
-        cp assets/Background.png $MOUNT_PATH/usr/share/backgrounds/xfce/xfce-verticals.png
-    fi
-fi
-
-#Exporting variables to be able to use in chroot
-export YELLOW="$YELLOW"
-export PURPLE="$PURPLE"
-export LIGHT_RED="$LIGHT_RED"
-export LIGHT_GREEN="$LIGHT_GREEN"
-export LIGHT_CYAN="$LIGHT_CYAN"
-export NOCOLOUR="$NOCOLOUR"
-
-export USER_NAME="$USER_NAME"
-export AUR_PACKAGES="$AUR_PACKAGES"
-export SELECTED_GREETER="$SELECTED_GREETER"
-export SERVICES="$SERVICES"
-
-#Export functions to be able to use in chroot
-export -f prompt_info
-export -f prompt_warning
-export -f check_connection
-export -f failure
-export -f Exit_
-export -f aur
-
-#Run aur function
-arch-chroot "$MOUNT_PATH" /bin/bash -c "aur" || Exit_ $?
-
-#Activate time synchronization
-prompt_info "Activating time synchronization..."
-timedatectl set-ntp true
-
-Umount_
-
-echo
-echo
-
-#http://patorjk.com/software/taag/#p=display&f=ANSI%20Shadow&t=!!%20Setup%20finished%20!!
-printf "${LIGHT_CYAN}
-██╗██╗    ███████╗███████╗████████╗██╗   ██╗██████╗     ███████╗██╗███╗   ██╗██╗███████╗██╗  ██╗███████╗██████╗     ██╗██╗
-██║██║    ██╔════╝██╔════╝╚══██╔══╝██║   ██║██╔══██╗    ██╔════╝██║████╗  ██║██║██╔════╝██║  ██║██╔════╝██╔══██╗    ██║██║
-██║██║    ███████╗█████╗     ██║   ██║   ██║██████╔╝    █████╗  ██║██╔██╗ ██║██║███████╗███████║█████╗  ██║  ██║    ██║██║
-╚═╝╚═╝    ╚════██║██╔══╝     ██║   ██║   ██║██╔═══╝     ██╔══╝  ██║██║╚██╗██║██║╚════██║██╔══██║██╔══╝  ██║  ██║    ╚═╝╚═╝
-██╗██╗    ███████║███████╗   ██║   ╚██████╔╝██║         ██║     ██║██║ ╚████║██║███████║██║  ██║███████╗██████╔╝    ██╗██╗
-╚═╝╚═╝    ╚══════╝╚══════╝   ╚═╝    ╚═════╝ ╚═╝         ╚═╝     ╚═╝╚═╝  ╚═══╝╚═╝╚══════╝╚═╝  ╚═╝╚══════╝╚═════╝     ╚═╝╚═╝
-${NOCOLOUR}"
-
-echo
-printf "${LIGHT_GREEN}You can safely reboot now.${NOCOLOUR}"
-echo
-
-Exit_
-'
-
-} > setup-second-phase.sh
-
-chmod +x setup-second-phase.sh
-
+    prompt_different "AUR configuration complete!"
 }
 
 
 
 # ---------------------------------------------------------------------------- #
-#                                  First Phase                                 #
+#                                     MAIN                                     #
 # ---------------------------------------------------------------------------- #
 
 #This script assumes keyboard layout has already been set
@@ -2214,8 +1969,8 @@ export LIGHT_GREEN="$LIGHT_GREEN"
 export NOCOLOUR="$NOCOLOUR"
 
 #Export functions to be able to use in chroot
-export -f number_check
 export -f yes_no
+export -f number_check
 export -f prompt_info
 export -f prompt_warning
 export -f prompt_question
@@ -2223,14 +1978,93 @@ export -f prompt_different
 
 export -f setup
 
+#Setup
 arch-chroot "$MOUNT_PATH" /bin/bash -c "setup"
 
-#Setup second phase
-setup-second-phase
+#Copy background images
+prompt_info "Copying background images..."
+if [ -d "assets" ]; then
+
+    cp assets/Login_screen.png "$MOUNT_PATH/usr/share/backgrounds"
+    cp assets/Background.png "$MOUNT_PATH/usr/share/backgrounds"
+
+    #Change xfce's default background
+    if [ -d "$MOUNT_PATH/usr/share/backgrounds/xfce" ]; then
+    
+        cp assets/Background.png "$MOUNT_PATH/usr/share/backgrounds/xfce/xfce-verticals.png"
+    fi
+fi
+
+#Export additional variables
+export AUR_PACKAGES="$AUR_PACKAGES"
+export SELECTED_GREETER="$SELECTED_GREETER"
+export SERVICES="$SERVICES"
+
+#Export additional functions
+export -f check_connection
+export -f failure
+export -f Exit_
+
+export -f post-install
+
+#Post install
+arch-chroot "$MOUNT_PATH" /bin/bash -c "post-install"
+
+
+#Unset everything before generating initramfs
+unset NUMBER_CHECK
+unset ANSWER
+unset DEVICE
+unset IS_ENCRYPT
+unset DISK
+unset ENCRYPT_PARTITION
+unset SWAP_PARTITION
+unset VOLGROUP
+unset GRUB_ARGS
+unset TMP_FILE
+
+unset AUR_PACKAGES
+unset SELECTED_GREETER
+unset SERVICES
+
+unset YELLOW
+unset PURPLE
+unset LIGHT_RED
+unset LIGHT_CYAN
+unset LIGHT_GREEN
+unset NOCOLOUR
+
+unset -f yes_no
+unset -f number_check
+unset -f prompt_info
+unset -f prompt_warning
+unset -f prompt_question
+unset -f prompt_different
+unset -f setup
+unset -f post-install
+unset -f check_connection
+unset -f failure
+unset -f Exit_
+
+
+#Initramfs
+prompt_info "Generating initramfs..."
+arch-chroot "$MOUNT_PATH" /bin/bash -c "mkinitcpio -P"
+
+
+#http://patorjk.com/software/taag/#p=display&f=ANSI%20Shadow&t=!!%20Setup%20finished%20!!
+printf "${LIGHT_CYAN}
+██╗██╗    ███████╗███████╗████████╗██╗   ██╗██████╗     ███████╗██╗███╗   ██╗██╗███████╗██╗  ██╗███████╗██████╗     ██╗██╗
+██║██║    ██╔════╝██╔════╝╚══██╔══╝██║   ██║██╔══██╗    ██╔════╝██║████╗  ██║██║██╔════╝██║  ██║██╔════╝██╔══██╗    ██║██║
+██║██║    ███████╗█████╗     ██║   ██║   ██║██████╔╝    █████╗  ██║██╔██╗ ██║██║███████╗███████║█████╗  ██║  ██║    ██║██║
+╚═╝╚═╝    ╚════██║██╔══╝     ██║   ██║   ██║██╔═══╝     ██╔══╝  ██║██║╚██╗██║██║╚════██║██╔══██║██╔══╝  ██║  ██║    ╚═╝╚═╝
+██╗██╗    ███████║███████╗   ██║   ╚██████╔╝██║         ██║     ██║██║ ╚████║██║███████║██║  ██║███████╗██████╔╝    ██╗██╗
+╚═╝╚═╝    ╚══════╝╚══════╝   ╚═╝    ╚═════╝ ╚═╝         ╚═╝     ╚═╝╚═╝  ╚═══╝╚═╝╚══════╝╚═╝  ╚═╝╚══════╝╚═════╝     ╚═╝╚═╝
+${NOCOLOUR}"
+
+echo
+printf "${LIGHT_GREEN}You can safely reboot now.${NOCOLOUR}"
+echo
 
 #Remove lock
 rm -f "/tmp/$PROGRAM_NAME.lock"
-
-#First phase finish
-prompt_warning "Please type ./setup-second-phase.sh"
-echo
