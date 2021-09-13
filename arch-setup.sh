@@ -2023,9 +2023,7 @@ echo "$sudo_contents" > "$MOUNT_PATH/etc/sudoers"
 
 #Backgrounds
 prompt_info "Arranging backgrounds..."
-if [ -d "$HOME/Arch-setup/assets" ]; then
-
-    cd "$HOME/Arch-setup/assets"
+if [ -d "assets" ]; then
 
     cp Login_screen.png "$MOUNT_PATH/usr/share/backgrounds"
     cp Background.png "$MOUNT_PATH/usr/share/backgrounds"
