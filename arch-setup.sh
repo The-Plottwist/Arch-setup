@@ -249,13 +249,9 @@ function Umount_ () {
         sleep 3s
     fi
 
-    #Exclude /run/archiso... partition
-    declare to_exclude=""
-    to_exclude="$(lsblk -o mountpoints,path | grep -w /run/archiso | awk '{print $2}')"
-
     #Inform the kernel
     prompt_info "Informing kernel about partition changes..."
-    partprobe | grep -v "${to_exclude:0: -1}" #omit the number at the end
+    partprobe &> /dev/null
 }
 
 
@@ -350,7 +346,7 @@ function partition_check () {
     fi
 
     #Use awk to remove unnecessary spaces
-    while ! output=$(lsblk -o type,path "$DISK" | awk '{print $1,$2}' | grep -v "disk" | grep "$input"); do
+    while ! output=$(lsblk -o type,path "$DISK" | awk '{print $1,$2}' | grep -v "disk" | grep -w "$input"); do
     
         if [ "$is_argument" == "false" ]; then
         
@@ -1091,7 +1087,7 @@ TIMEZONE=$(echo "$l_timezones" | head -"$NUMBER_CHECK" | tail -1)
 echo
 printf "${LIGHT_GREEN}Your timezone is: ${LIGHT_CYAN}%s${NOCOLOUR}" "$TIMEZONE"
 
-sleep 5s
+sleep 3s
 
 #Get Disk
 clear
@@ -2081,7 +2077,7 @@ if [ -d "$HOME/Arch-setup/assets" ]; then
                 
                 if [ -n "$bkg" ]; then
                 
-                    echo "$bkg" > "/etc/lightdm/lightdm-gtk-greeter.conf"
+                    echo "$bkg" > "$MOUNT_PATH/etc/lightdm/lightdm-gtk-greeter.conf"
                 else
                 
                     {
