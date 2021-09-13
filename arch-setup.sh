@@ -897,18 +897,9 @@ declare iso_max=""
 while true; do
 
     prompt_question "Please enter an ISO code to list the available layouts (ex: fr, de, au)"
-    prompt_question "(You can also type: 'd' - Use default [US] layout, 's' - Skip without changes):"
+    prompt_question "(You can also type: 'd' - Use default [US] layout):"
     read -e -r -p " " iso
 
-    case $iso in
-
-        "S" | "s")
-            
-            break
-        ;;
-    esac
-
-    
     while true; do
     
         case $iso in
@@ -916,11 +907,6 @@ while true; do
             "D" | "d")
             
                 KEY_LAYOUT="us"
-                break
-            ;;
-            
-            "S" | "s")
-            
                 break
             ;;
         esac
