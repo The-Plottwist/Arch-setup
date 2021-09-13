@@ -71,7 +71,7 @@ declare USER_PASS=""
 declare ROOT_PASS=""
 
 #It has a function with the same name
-declare PKG_SPECIFIC_OPERATIONS="virtualbox clamav lightdm-slick-greeter"
+declare PKG_SPECIFIC_OPERATIONS="virtualbox clamav lightdm-slick-greeter lightdm-gtk-greeter"
 
 # ---------------------------- Packages To Install --------------------------- #
 
@@ -117,7 +117,7 @@ declare SERVICES="dhcpcd NetworkManager thermald cpupower lightdm"
 declare LIGHT_RED='\033[1;31m'
 #declare GREEN='\033[0;32m'
 declare LIGHT_GREEN='\033[1;32m'
-declare ORANGE='\033[0;33m'
+#declare ORANGE='\033[0;33m'
 declare YELLOW='\033[1;33m'
 #declare BLUE='\033[0;34m'
 declare LIGHT_BLUE='\033[1;34m'
@@ -142,7 +142,7 @@ function clean_up () {
     
     rm -f "/tmp/$PROGRAM_NAME.lock"
     
-    Umount_
+    #Umount_
     
     prompt_warning "Exiting..."
     exit "130"
@@ -168,6 +168,7 @@ function prompt_info () {
 
 function prompt_question () {
 
+    echo
     printf "${LIGHT_CYAN}%s${NOCOLOUR}" "$1"
 }
 
@@ -179,6 +180,7 @@ function prompt_different () {
 
 function prompt_partition () {
 
+    echo
     printf "${LIGHT_CYAN}Please enter the${LIGHT_RED} PATH ${LIGHT_CYAN}for${LIGHT_RED} %s ${LIGHT_CYAN}partition:${NOCOLOUR}" "$1"
 }
 
@@ -247,9 +249,13 @@ function Umount_ () {
         sleep 3s
     fi
 
+    #Exclude archiso partition
+    declare to_exclude=""
+    to_exclude="$(lsblk -o mountpoints,path | grep archiso | awk '{print $2}')"
+
     #Inform the kernel
     prompt_info "Informing kernel about partition changes..."
-    partprobe &> /dev/null
+    partprobe | grep -v "$to_exclude"
 }
 
 
@@ -257,7 +263,7 @@ function Exit_ () {
 
     rm -f "/tmp/$PROGRAM_NAME.lock"
 
-    Umount_
+    #Umount_
 
     exit "$1"
 }
@@ -499,6 +505,7 @@ function pkg_select () {
 }
 
 
+#Search for a package and add it to the PKG_FIND if exist
 function pkg_find () {
 
     declare search=("$@")
@@ -554,7 +561,7 @@ function pkg_specific_operations () {
                 case $j in
                 
                     #https://wiki.archlinux.org/title/VirtualBox#Installation_steps_for_Arch_Linux_hosts
-                    virtualbox)
+                    "virtualbox")
                     
                         declare is_default_kernel=""
                         declare is_lts=""
@@ -594,14 +601,19 @@ function pkg_specific_operations () {
                         #They are not installed by default.
                     ;;
                     
-                    clamav)
+                    "clamav")
                     
                         SERVICES+=" clamav-freshclam"
                     ;;
                     
-                    lightdm-slick-greeter)
+                    "lightdm-slick-greeter")
                     
                         AUR_PACKAGES+=" lightdm-settings"
+                    ;;
+                    
+                    "lightdm-gtk-greeter")
+                    
+                        PACKAGES+=" lightdm-gtk-greeter-settings"
                     ;;
                 esac
             fi
@@ -712,7 +724,7 @@ function post-install () {
     prompt_info "Installing yay..."
     cd "/home/$USER_NAME/Git-Hub/yay" || failure "Cannot change directory to /home/$USER_NAME/Git-Hub/yay"
     sudo -u "$USER_NAME" makepkg -si --noconfirm || failure "Error Cannot install yay!"
-    
+
     #Download aur pkgbuilds
     prompt_info "Downloading aur pkgbuilds..."
     mkdir -p "/home/$USER_NAME/.cache/yay" || failure "Cannot make /home/$USER_NAME/.cache/yay directory!"
@@ -721,14 +733,14 @@ function post-install () {
 
     #Arrange permissions
     chown -R "$USER_NAME:$USER_NAME" "/home/$USER_NAME/.cache/"
-    
+
     #Install aur packages
     prompt_info "Installing aur packages..."
     cd "/home/$USER_NAME/.cache/yay" || failure "Cannot change directory to /home/$USER_NAME/.cache/yay"
     for i in *; do
 
         cd "$i"
-        echo "$USER_PASS" | sudo -S -u "$USER_NAME" makepkg -si --noconfirm
+        sudo -u "$USER_NAME" makepkg -si --noconfirm
         cd ..
     done
     
@@ -736,21 +748,6 @@ function post-install () {
     #Check if /etc/lightdm.conf exists
     if [ -f "/etc/lightdm/lightdm.conf" ]; then
     
-        #Background
-        prompt_info "Arranging login screen background..."
-        if output=$([ -f "/usr/share/backgrounds/Login_screen.png" ] && [ "$SELECTED_GREETER" == "lightdm-slick-greeter" ]); then
-        
-            {
-                echo "[Greeter]"
-                echo "draw-user-backgrounds=false"
-                echo "draw-grid=false"
-                echo "enable-hidpi=auto"
-                echo "background=/usr/share/backgrounds/Login_screen.png"
-                echo "theme-name=Adwaita-dark"
-                echo "icon-theme-name=Adwaita"
-            } > /etc/lightdm/slick-greeter.conf
-        fi
-            
         if pacman -Q "$SELECTED_GREETER"; then
         
             declare lightdm_conf=""
@@ -830,16 +827,16 @@ clear
 echo
 echo
 echo
-prompt_question "
+printf "${LIGHT_CYAN}
                █████╗ ██████╗  ██████╗██╗  ██╗    ███████╗███████╗████████╗██╗   ██╗██████╗ 
               ██╔══██╗██╔══██╗██╔════╝██║  ██║    ██╔════╝██╔════╝╚══██╔══╝██║   ██║██╔══██╗
               ███████║██████╔╝██║     ███████║    ███████╗█████╗     ██║   ██║   ██║██████╔╝
               ██╔══██║██╔══██╗██║     ██╔══██║    ╚════██║██╔══╝     ██║   ██║   ██║██╔═══╝ 
               ██║  ██║██║  ██║╚██████╗██║  ██║    ███████║███████╗   ██║   ╚██████╔╝██║     
               ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝    ╚══════╝╚══════╝   ╚═╝    ╚═════╝ ╚═╝     
-"
+${NOCOLOUR}"
 #http://patorjk.com/software/taag/#p=display&f=Kban&t=by%20The-Plottwist
-prompt_info "
+printf "${LIGHT_RED}
 '||                  |''||''| '||              ' '||''|.  '||            .     .                ||           .  
  || ...  .... ...       ||     || ..     ....     ||   ||  ||    ...   .||.  .||.  ... ... ... ...   ....  .||. 
  ||'  ||  '|.  |        ||     ||' ||  .|...||    ||...|'  ||  .|  '|.  ||    ||    ||  ||  |   ||  ||. '   ||  
@@ -847,7 +844,7 @@ prompt_info "
  '|...'     '|         .||.   .||. ||.  '|...'   .||.     .||.  '|..|'  '|.'  '|.'    |   |    .||. |'..|'  '|.'
          .. |                                                                                                   
           ''                                                                                                    
-"
+${NOCOLOUR}"
 
 #Disclaimer
 prompt_different "This script is for installing archlinux on an empty (or semi-empty) disk."
@@ -857,8 +854,8 @@ prompt_different "You can modify this script to your needs, otherwise XFCE will 
 echo
 echo
 
-printf "${ORANGE}If you encounter a problem or want to stop the command, you can press ${LIGHT_CYAN}Ctrl-C${ORANGE} to quit.${NOCOLOUR}\n"
-printf "${ORANGE}Use ${LIGHT_CYAN}Ctrl-Z${ORANGE} in dire situations and reboot your system afterwards as it doesn't actually stop the script.${NOCOLOUR}\n"
+printf "${LIGHT_BLUE}If you encounter a problem or want to stop the command, you can press ${LIGHT_CYAN}Ctrl-C${LIGHT_BLUE} to quit.${NOCOLOUR}\n"
+printf "${LIGHT_BLUE}Use ${LIGHT_CYAN}Ctrl-Z${LIGHT_BLUE} in dire situations and reboot your system afterwards as it doesn't actually stop the script.${NOCOLOUR}\n"
 echo
 
 prompt_warning "This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
@@ -876,16 +873,34 @@ declare iso_max=""
 
 while true; do
 
-    prompt_question "Please enter an ISO code to list the available keyboard layouts (ex: fr, de, au) or type 'd' to use the default (US) layout:"
+    prompt_question "Please enter an ISO code to list the available layouts (ex: fr, de, au)"
+    prompt_question "(You can also type: 'd' - Use default [US] layout, 's' - Skip without changes):"
     read -e -r -p " " iso
+
+    case $iso in
+
+        "S" | "s")
+            
+            break
+        ;;
+    esac
+
     
     while true; do
+    
+        case $iso in
         
-        if [ "$iso" == "d" ]; then
-        
-            KEY_LAYOUT="us"
-            break
-        fi
+            "D" | "d")
+            
+                KEY_LAYOUT="us"
+                break
+            ;;
+            
+            "S" | "s")
+            
+                break
+            ;;
+        esac
         
         l_layouts=$(find /usr/share/kbd/keymaps -type f -name "*.map.gz" -printf "%f\n" | sed "s/.map.gz//g" | grep -i "$iso")
         
@@ -893,7 +908,7 @@ while true; do
             
             iso_max=$(echo "$l_layouts" | cat -n | tail -1 | awk '{print $1}')
             
-            list "$l_layouts" "${LIGHT_GREEN}- Please find your layout in the list -${NOCOLOUR}"
+            list "$l_layouts" "${LIGHT_GREEN}- Please find your layout in the list -\n${LIGHT_RED}- There may be irrelevent layouts -${NOCOLOUR}"
             
             prompt_question "Please specify the number of your layout or type an ISO code to re-list:"
             read -e -r -p " " iso
@@ -907,13 +922,15 @@ while true; do
         
             echo
             prompt_warning "No layouts found."
-            prompt_question "Please enter another ISO code or type 'd' to use the default (US) layout:"
+            prompt_question "Please enter another ISO or type 'd' or 's':"
             read -e -r -p " " iso
         fi
     done
     loadkeys "$KEY_LAYOUT"
     
-    prompt_question "Do you want to test your layout?:"
+    clear
+    
+    prompt_question "Do you want to test your layout? (y/n):"
     yes_no
     if [ "$ANSWER" == "y" ]; then
     
@@ -930,9 +947,10 @@ while true; do
         } > "$tmp_file"
         
         nano "$tmp_file"
+        clear
     fi
     
-    printf "${LIGHT_CYAN}Do you want to use another layout? (Current layout: ${LIGHT_RED}$KEY_LAYOUT${LIGHT_CYAN}):${NOCOLOUR}"
+    printf "${LIGHT_CYAN}Do you want to change ${LIGHT_RED}$KEY_LAYOUT${LIGHT_CYAN} layout? (y/n):${NOCOLOUR}"
     yes_no
     
     if [ "$ANSWER" == "n" ]; then
@@ -941,25 +959,15 @@ while true; do
     fi
 done
 
-
 #Device name
 prompt_question "Please enter a device name:"
 read -e -r -p " " DEVICE
-VOLGROUP="$DEVICE"VolGroup
-while ! { useradd "$VOLGROUP" &> /dev/null; }; do
 
-    echo
-    prompt_warning "Invalid device name!"
-    prompt_question "Please re-enter:"
-    read -e -r -p " " DEVICE
-    VOLGROUP="$DEVICE"VolGroup
-done
-userdel "$VOLGROUP"
+VOLGROUP="$DEVICE"VolGroup
 
 MOUNT_PATH="$HOME/INSTALL/$DEVICE"
 mkdir -p "$MOUNT_PATH"
 
-echo
 
 #User name
 prompt_question "Please enter a user name:"
@@ -973,14 +981,12 @@ while ! { useradd "$USER_NAME" &> /dev/null; }; do
 done
 userdel "$USER_NAME"
 
-echo
-
 #User pass
 while true; do
 
     declare check=""
 
-    prompt_question "Please enter a password for user $USER_NAME:"
+    printf "${LIGHT_CYAN}Please enter a password for user ${LIGHT_RED}$USER_NAME${LIGHT_CYAN}:${NOCOLOUR}"
     read -s -e -r -p " " USER_PASS
     
     prompt_question "Please re-enter:"
@@ -992,10 +998,12 @@ while true; do
     else
     
         echo
+        echo
         prompt_warning "Passwords don't match!"
     fi
 done
 
+echo
 echo
 
 #Root pass
@@ -1003,7 +1011,7 @@ while true; do
 
     check=""
 
-    prompt_question "Please enter a password for root:"
+    printf "${LIGHT_CYAN}Please enter a password for ${LIGHT_RED}root${LIGHT_CYAN}:${NOCOLOUR}"
     read -s -e -r -p " " ROOT_PASS
     
     prompt_question "Please re-enter:"
@@ -1015,6 +1023,7 @@ while true; do
     else
     
         echo
+	echo
         prompt_warning "Passwords don't match!"
     fi
 done
@@ -1053,10 +1062,9 @@ done
 TIMEZONE=$(echo "$l_timezones" | head -"$NUMBER_CHECK" | tail -1)
 
 echo
-echo
-printf "${PURPLE}Your timezone is: ${LIGHT_CYAN}%s${NOCOLOUR}" "$TIMEZONE"
-echo
+printf "${LIGHT_GREEN}Your timezone is: ${LIGHT_CYAN}%s${NOCOLOUR}" "$TIMEZONE"
 
+sleep 5s
 
 #Get Disk
 clear
@@ -1436,8 +1444,6 @@ else #Manual partition selection
 
     if [ -n "$luks" ]; then
 
-        declare -i current_=0
-    
         prompt_warning "In this option, encrypted partitions will not be handled automatically."
         printf "${YELLOW}You need to follow one of the guides in: ${PURPLE}https://wiki.archlinux.org/title/Dm-crypt/Encrypting_an_entire_system#Overview${NOCOLOUR}"
         echo
@@ -1447,6 +1453,7 @@ else #Manual partition selection
         echo
         echo
     
+        declare -i current_=0
         for i in $luks; do
     
             prompt_question "Do you want to open $i (y/n):"
@@ -1457,14 +1464,11 @@ else #Manual partition selection
                 current_+=1
     
                 prompt_info "Opening $i..."
-                cryptsetup open "$i" LUKS$current_ || failure "Error! try rebooting."
+                cryptsetup open "$i" LUKS$current_ || failure "Error! Cannot open $i, try rebooting."
             fi
 
-            sleep 3s
+            sleep 1s
         done
-    else
-    
-        sleep 7s
     fi
 
 
@@ -1480,11 +1484,13 @@ else #Manual partition selection
         echo
         echo "$print"
         
+        echo
         printf "${LIGHT_CYAN}Please specify the number for the Grub parition ${LIGHT_RED}(1mib partition advised)${LIGHT_CYAN}: ${NOCOLOUR}"
         number_check "$last_partition"
         
         parted "$DISK" --script "set $NUMBER_CHECK bios_grub on"
         sleep 2s
+        clear
     fi
 
     
@@ -1535,6 +1541,7 @@ else #Manual partition selection
     SWAP_PARTITION="$PART_CHECK"
 
     #Is seperate?
+    echo
     prompt_different "Does home and system partitions seperate? (y/n):"
     yes_no
     if [ "$ANSWER" == "y" ]; then
@@ -1934,12 +1941,14 @@ function setup () {
 
     #User
     prompt_info "Adding user..."
-    useradd --password "$USER_PASS" -m -G sudo "$USER_NAME"
+    useradd -m -G sudo "$USER_NAME"
+    echo "$USER_NAME:$USER_PASS" | chpasswd
     
     #Root
     prompt_info "Changing root pass..."
     echo "root:$ROOT_PASS" | chpasswd
 }
+
 
 #Export variables to be able to use in chroot
 export USER_NAME="$USER_NAME"
@@ -1980,22 +1989,6 @@ export -f setup
 #Setup
 arch-chroot "$MOUNT_PATH" /bin/bash -c "setup"
 
-
-#Copy background images
-prompt_info "Copying background images..."
-if [ -d "assets" ]; then
-
-    cp assets/Login_screen.png "$MOUNT_PATH/usr/share/backgrounds"
-    cp assets/Background.png "$MOUNT_PATH/usr/share/backgrounds"
-
-    #Change xfce's default background
-    if [ -d "$MOUNT_PATH/usr/share/backgrounds/xfce" ]; then
-    
-        cp assets/Background.png "$MOUNT_PATH/usr/share/backgrounds/xfce/xfce-verticals.png"
-    fi
-fi
-
-
 #Export additional variables
 export AUR_PACKAGES="$AUR_PACKAGES"
 export SELECTED_GREETER="$SELECTED_GREETER"
@@ -2008,11 +2001,75 @@ export -f Exit_
 
 export -f post-install
 
+#Arrange sudo for post-install
+declare sudo_contents=""
+sudo_contents="$(cat $MOUNT_PATH/etc/sudoers)"
+printf "\n\n%s ALL=(ALL) NOPASSWD: ALL\n" "$USER_NAME" >> "$MOUNT_PATH/etc/sudoers"
+
 #Post install
-arch-chroot "$MOUNT_PATH" /bin/bash -c "post-install"
+arch-chroot "$MOUNT_PATH" /bin/bash -c "post-install" || Exit_ $?
+
+#Restore sudo
+echo "$sudo_contents" > "$MOUNT_PATH/etc/sudoers"
+
+#Backgrounds
+pkg_find "lightdm"
+prompt_info "Arranging backgrounds..."
+if [ -d "$HOME/Arch-setup/assets" ]; then
+
+    cd "$HOME/Arch-setup/assets"
+
+    cp Login_screen.png "$MOUNT_PATH/usr/share/backgrounds"
+    cp Background.png "$MOUNT_PATH/usr/share/backgrounds"
+
+    #XFCE
+    if [ -d "$MOUNT_PATH/usr/share/backgrounds/xfce" ]; then
+    
+        cp Background.png "$MOUNT_PATH/usr/share/backgrounds/xfce/xfce-verticals.png"
+    fi
+    
+    #Login screen
+    if echo "$PKG_FIND" | grep -q -x lightdm; then
+    
+        case $SELECTED_GREETER in
+        
+            "lightdm-slick-greeter")
+        
+                {
+                    echo "[Greeter]"
+                    echo "draw-user-backgrounds=false"
+                    echo "draw-grid=false"
+                    echo "enable-hidpi=auto"
+                    echo "background=/usr/share/backgrounds/Login_screen.png"
+                    echo "theme-name=Adwaita-dark"
+                    echo "icon-theme-name=Adwaita"
+                } > "$MOUNT_PATH/etc/lightdm/slick-greeter.conf"
+            ;;
+            
+            "lightdm-gtk-greeter")
+            
+                declare bkg=""
+                bkg=$(sed "s/#background=/background=\/usr\/share\/backgrounds\/Login_screen.png/g" "$MOUNT_PATH/etc/lightdm/lightdm-gtk-greeter.conf")
+                
+                sleep 1s
+                
+                if [ -n "$bkg" ]; then
+                
+                    echo "$bkg" > "/etc/lightdm/lightdm-gtk-greeter.conf"
+                else
+                
+                    {
+                        echo "[greeter]"
+                        echo "background=/usr/share/backgrounds/Login_screen.png"
+                    } > "$MOUNT_PATH/etc/lightdm/lightdm-gtk-greeter.conf"
+                fi
+            ;;
+        esac
+    fi
+fi
 
 
-#Unset everything before generating initramfs
+#Unset before generating initramfs
 unset NUMBER_CHECK
 unset ANSWER
 unset DEVICE
@@ -2028,16 +2085,9 @@ unset AUR_PACKAGES
 unset SELECTED_GREETER
 unset SERVICES
 
-unset YELLOW
-unset PURPLE
-unset LIGHT_RED
-unset LIGHT_CYAN
-unset LIGHT_GREEN
-unset NOCOLOUR
-
 unset -f yes_no
 unset -f number_check
-unset -f prompt_info
+#unset -f prompt_info
 unset -f prompt_warning
 unset -f prompt_question
 unset -f prompt_different
@@ -2051,6 +2101,9 @@ unset -f Exit_
 #Initramfs
 prompt_info "Generating initramfs..."
 arch-chroot "$MOUNT_PATH" /bin/bash -c "mkinitcpio -P"
+
+
+Umount_
 
 
 #http://patorjk.com/software/taag/#p=display&f=ANSI%20Shadow&t=!!%20Setup%20finished%20!!
@@ -2067,4 +2120,5 @@ echo
 printf "${LIGHT_GREEN}You can safely reboot now.${NOCOLOUR}"
 echo
 
-Exit_
+#Remove lock
+rm -f "/tmp/$PROGRAM_NAME.lock"
