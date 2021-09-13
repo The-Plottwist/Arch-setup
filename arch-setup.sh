@@ -249,13 +249,13 @@ function Umount_ () {
         sleep 3s
     fi
 
-    #Exclude archiso partition
+    #Exclude /run/archiso... partition
     declare to_exclude=""
-    to_exclude="$(lsblk -o mountpoints,path | grep archiso | awk '{print $2}')"
+    to_exclude="$(lsblk -o mountpoints,path | grep -w /run/archiso | awk '{print $2}')"
 
     #Inform the kernel
     prompt_info "Informing kernel about partition changes..."
-    partprobe | grep -v -i "$to_exclude"
+    partprobe | grep -v "${to_exclude:0: -1}" #omit the number at the end
 }
 
 
