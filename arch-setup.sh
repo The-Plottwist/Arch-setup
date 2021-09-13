@@ -255,7 +255,7 @@ function Umount_ () {
 
     #Inform the kernel
     prompt_info "Informing kernel about partition changes..."
-    partprobe | grep -v "$to_exclude"
+    partprobe | grep -v -i "$to_exclude"
 }
 
 
@@ -506,19 +506,36 @@ function pkg_select () {
 
 
 #Search for a package and add it to the PKG_FIND if exist
+#--quiet: Check only one package and return accordingly
 function pkg_find () {
 
-    declare search=("$@")
+    declare is_quiet=""
+    declare search=("")
+
+    if [ "$1" == "--quiet" ]; then
+
+        is_quiet="true"
+        search=("$2")
+    else
+
+        is_quiet="false"
+        search=("$@")
+    fi
 
     #Check if the given package is alredy found
     for i in $PKG_FIND; do
     
         for j in "${search[@]}"; do
         
-            #Omit
             if [ "$j" == "$i" ]; then
-            
-                search=( "${search[@]/$i}" )
+
+                if [ "$is_quiet" == "false" ]; then
+
+                    search=( "${search[@]/$i}" ) #Omit the founded package
+                else
+
+                    return 0
+                fi
             fi
         done
     done
@@ -535,14 +552,24 @@ function pkg_find () {
         
             for j in "${search[@]}"; do
             
-                #Add to the PKG_FIND
                 if [ "$i" == "$j" ]; then
                 
-                    PKG_FIND+=" $j"
-                    search=( "${search[@]/$i}" ) #Omit the founded package, thus optimize the search.
+                    if [ "$is_quiet" == "false" ]; then
+
+                        PKG_FIND+=" $j" #Add to the PKG_FIND
+                        search=( "${search[@]/$i}" ) #Omit the founded package, thus optimize the search.
+                    else
+
+                        return 0
+                    fi
                 fi
             done
         done
+    fi
+
+    if [ "$is_quiet" == "true" ]; then
+
+        return 17
     fi
 }
 
@@ -2013,7 +2040,6 @@ arch-chroot "$MOUNT_PATH" /bin/bash -c "post-install" || Exit_ $?
 echo "$sudo_contents" > "$MOUNT_PATH/etc/sudoers"
 
 #Backgrounds
-pkg_find "lightdm"
 prompt_info "Arranging backgrounds..."
 if [ -d "$HOME/Arch-setup/assets" ]; then
 
@@ -2029,7 +2055,7 @@ if [ -d "$HOME/Arch-setup/assets" ]; then
     fi
     
     #Login screen
-    if echo "$PKG_FIND" | grep -q -x lightdm; then
+    if pkg_find --quiet "lightdm"; then
     
         case $SELECTED_GREETER in
         
@@ -2074,7 +2100,6 @@ unset NUMBER_CHECK
 unset ANSWER
 unset DEVICE
 unset IS_ENCRYPT
-unset DISK
 unset ENCRYPT_PARTITION
 unset SWAP_PARTITION
 unset VOLGROUP
@@ -2099,6 +2124,7 @@ unset -f Exit_
 
 
 #Initramfs
+echo
 prompt_info "Generating initramfs..."
 arch-chroot "$MOUNT_PATH" /bin/bash -c "mkinitcpio -P"
 
