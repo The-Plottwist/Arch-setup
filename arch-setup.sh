@@ -480,7 +480,7 @@ function print_packages () {
 #and asks each of them to include it in the original set or not
 function pkg_select () {
 
-    declare SELECTION_=""
+    declare selection_=""
     print_packages
 
     for i in $1; do
@@ -493,11 +493,11 @@ function pkg_select () {
         
         if [ "$ANSWER" == "y" ]; then
         
-            SELECTION_+=" $i"
+            selection_+=" $i"
         fi
     done
     
-    PKG_SELECT="$SELECTION_"
+    PKG_SELECT="$selection_"
 }
 
 
@@ -550,9 +550,10 @@ function pkg_find () {
             
                 if [ "$i" == "$j" ]; then
                 
+                    PKG_FIND+=" $j" #Add to the PKG_FIND
+                    
                     if [ "$is_quiet" == "false" ]; then
 
-                        PKG_FIND+=" $j" #Add to the PKG_FIND
                         search=( "${search[@]/$i}" ) #Omit the founded package, thus optimize the search.
                     else
 
@@ -646,20 +647,20 @@ function pkg_specific_operations () {
 
 function select_one () {
 
-    declare MESSAGE=""
-    declare OFFICIAL_PKGS=""
-    declare AUR_PKGS=""
+    declare message=""
+    declare official_pkgs=""
+    declare aur_pkgs=""
     
-    MESSAGE="$1"
-    OFFICIAL_PKGS="$2"
-    AUR_PKGS="$3"
+    message="$1"
+    official_pkgs="$2"
+    aur_pkgs="$3"
 
-    prompt_different "$MESSAGE"
+    prompt_different "$message"
     echo
     echo
     
     declare -i max=0
-    for i in $OFFICIAL_PKGS; do
+    for i in $official_pkgs; do
     
         max+=1
         printf "${PURPLE}%s (${LIGHT_CYAN}%s${PURPLE}) ${NOCOLOUR}" "$i" "$max"
@@ -667,7 +668,7 @@ function select_one () {
     
     declare -i aur_part=0
     aur_part+=$max+1
-    for i in $AUR_PKGS; do
+    for i in $aur_pkgs; do
     
         max+=1
         printf "${PURPLE}%s (${LIGHT_CYAN}%s${PURPLE}) ${NOCOLOUR}" "$i" "$max"
@@ -681,7 +682,7 @@ function select_one () {
     
     #Include it in the installation
     declare -i current=0
-    for i in $OFFICIAL_PKGS $AUR_PKGS; do
+    for i in $official_pkgs $aur_pkgs; do
     
         current+=1
         if [ "$current" == "$NUMBER_CHECK" ]; then
