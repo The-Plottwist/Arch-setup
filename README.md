@@ -28,7 +28,9 @@ Archlinux is a distro that it gives full control to anyone who wants to install 
 
 - Adding a user account
 
-All of the packages are predifined and can be changed before running the script.
+- And a few more...
+
+All of the packages are predefined and can be changed before running the script.
 For more information, visit my [Packages](https://github.com/The-Plottwist/Arch-setup/blob/main/Packages.md) manual.
 
 ## Usage
