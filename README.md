@@ -20,21 +20,28 @@ Archlinux is a distro that it gives full control to anyone who wants to install 
 
 - Installing a bootloader
 
+- Installing a Desktop Environment
+
 - Installing a login manager & greeter
+
+- Setting a default background for desktop & login manager
 
 - Adding a user account
 
-Also sets a default background for the desktop and login manager.
+All of the packages are predifined and can be changed before running the script.
+For more information, visit my [Packages](https://github.com/The-Plottwist/Arch-setup/blob/main/Packages.md) manual.
 
 ## Usage
 
-**Internet:**
+*Script won't work if you don't have an active internet connection.*
+
+**Enabling Internet Connection:**
 
 - If you have a wired connection, just type `dhcpcd` and test it with `ping archlinux.org -c 1`
 
 - Otherwise follow this guide: <https://www.linuxandubuntu.com/home/how-to-setup-a-wifi-in-arch-linux-using-terminal>
 
-**Repository:**
+**Cloning the Repository:**
 
 - Install git with `pacman -S git`
 
@@ -64,12 +71,16 @@ In the script, change this:
 27 declare ENABLE_AUTO_PARTITIONING="true"
 ```
 
+## How to modify?
+
+You can read my manuals: [Breaking into pieces](https://github.com/The-Plottwist/Arch-setup/blob/main/Breaking-into-pieces.md) and [Before altering](https://github.com/The-Plottwist/Arch-setup/blob/main/Before-altering.md).
+
 ## Image Credentials
 
 Login screen photo *by Amir Esrafili*: <https://unsplash.com/photos/YP0nK_9TuC8>
 Desktop photo *by Bjorn Snelders*: <https://unsplash.com/photos/zNNPSqKRR2c>
 
-*Both of them are photoshopped by myself.*
+*Both photos are photoshopped by myself.*
 
 ## Followed Guides
 
