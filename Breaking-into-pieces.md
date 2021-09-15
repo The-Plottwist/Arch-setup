@@ -75,6 +75,7 @@ This file is only for demonstrative and understanding purposes and includes medi
 ## Globals
 
 Most of the function variables also share the same name with their respective function.
+
 Variables starting with `IS_` prefix are used as booleans.
 
 ```bash
@@ -125,6 +126,7 @@ The package sets that start with `ADDITIONAL_` prefix are optional packages. Eac
 These package sets however (`GREETER`, `GREETER_AUR`; `VIDEO_DRIVER`, `VIDEO_DRIVER_AUR`), are parsed within the `select_one` [function](#select_one) and only one of them being selected.
 
 `DE_PACKAGES`: Desktop environment packages.
+
 `DE_DEPENDENT_PACKAGES`: Desktop environment compatible packages. (by using the term compatible, it is emphasized that these packages don't need any additional desktop environment related dependencies.)
 
 ```bash
@@ -194,6 +196,7 @@ declare NOCOLOUR='\033[0m'
 ### Signal handling
 
 Trap command captures specified signals and runs `clean_up` function.
+
 `clean_up` removes the program lock and exits with an error level of 130. (Program lock prevents running another instance of the same program.)
 
 *Note: Unmounting is disabled by default to make debugging easier if something goes wrong.*
@@ -532,6 +535,7 @@ function number_check () {
 ### List
 
 Takes a batch of strings, passes them through numbering & colouring and prints them on screen with `less`. (usage: [keyboard layout](#keyboard-layout) - [timezone selection](#timezone-selection))
+
 The purpose of the numbering is that after exiting from the list, the user is asked to choose one of the items. *(Selection is handled outside of the function nevertheless.)*
 
 ```bash
@@ -705,7 +709,8 @@ function select_one () {
 ### Pkg_find
 
 Search for a package in the `PKG_FIND`, if not found, search all of the packages and add it to `PKG_FIND`.
-`--quiet`: Check only one package and return accordingly.
+
+`--quiet`: Check only one package and return accordingly. (Similar to `grep -q`)
 
 ```bash
 function pkg_find () {
