@@ -1,6 +1,6 @@
 # Breaking into Pieces
 
-This file is only for demonstrative and understanding purposes. Includes slight changes in the code.
+This file is only for demonstrative and understanding purposes and includes mediocre changes in the code. (Do not expect it to run)
 
 ### Table of contents
 
@@ -29,6 +29,11 @@ This file is only for demonstrative and understanding purposes. Includes slight 
     - [Pkg_find](#pkg_find)
     - [Pkg_specific_operations](#pkg_specific_operations)
 - [Post-install](#post-install)
+  - [Aur Helper](#aur-helper)
+  - [Aur Packages](#aur-packages)
+  - [Login Manager](#login-manager)
+  - [Services](#services-1)
+  - [Time Synchronization](#time-synchronization)
 - [Main](#main)
   - [Program Lock](#program-lock)
   - [Welcome Screen](#welcome-screen)
@@ -39,11 +44,13 @@ This file is only for demonstrative and understanding purposes. Includes slight 
   - [Root Password](#root-password)
   - [Timezone Selection](#timezone-selection)
   - [Get Disk](#get-disk)
-  - [UEFI Check](#uefi-check)
+  - [UEFI Check & Grub Arguments](#uefi-check--grub-arguments)
   - [Get Partition Table](#get-partition-table)
   - [Trimming](#trimming)
-  - [Automatic Partitioning](#automatic-partitioning)
-  - [Manual Partition Selection](#manual-partition-selection)
+  - [Partition Management](#partition-management)
+    - [Automatic Partitioning](#automatic-partitioning)
+    - [Manual Partition Selection](#manual-partition-selection)
+  - [Print Current Configuration](#print-current-configuration)
   - [Encrypting](#encrypting)
   - [File Systems](#file-systems)
   - [Mounting File Systems](#mounting-file-systems)
@@ -55,7 +62,12 @@ This file is only for demonstrative and understanding purposes. Includes slight 
   - [Installation](#installation)
   - [Generating Fstab](#generating-fstab)
   - [Setup](#setup)
-  - [Post Installation](#post-installation)
+    - [Various](#various)
+    - [Initramfs](#initramfs)
+    - [Boot loader](#boot-loader)
+    - [User management](#user-management)
+    - [Execute setup](#execute-setup)
+  - [Execute post-install](#execute-post-install)
   - [Arrange Backgrounds](#arrange-backgrounds)
   - [Generate Initramfs](#generate-initramfs)
   - [Finish](#finish)
@@ -146,7 +158,7 @@ declare SELECTED_VIDEO_DRIVER=""
 
 ## Services
 
-These services will be activated during the `post-install`.
+These services will be activated during the `post-install` (see: [Services](#services-1)).
 
 ```bash
 #Warning: This variable is also modified from the pkg_specific_operations function!
@@ -155,7 +167,7 @@ declare SERVICES="dhcpcd NetworkManager thermald cpupower lightdm"
 
 ## Colours
 
-In bash, colours are defined as escape sequences. Supported colours listed below. (commented ones are didn't used in the script.)
+In bash, colours are defined as escape sequences. Supported colours are listed below. (commented ones are didn't used in the script.)
 
 ```bash
 #declare BLACK='\033[0;30m'
@@ -844,6 +856,8 @@ function pkg_specific_operations () {
 
 # Post-install
 
+## Aur Helper
+
 ```bash
 #Will be called in arch-chroot
 function post-install () {
@@ -891,8 +905,11 @@ function post-install () {
     prompt_info "Installing yay..."
     cd "/home/$USER_NAME/Git-Hub/yay" || failure "Cannot change directory to /home/$USER_NAME/Git-Hub/yay"
     sudo -u "$USER_NAME" makepkg -si --noconfirm || failure "Error Cannot install yay!"
+```
 
-    #Download aur pkgbuilds
+## Aur Packages
+
+```bash
     prompt_info "Downloading aur pkgbuilds..."
     mkdir -p "/home/$USER_NAME/.cache/yay" || failure "Cannot make /home/$USER_NAME/.cache/yay directory!"
     cd "/home/$USER_NAME/.cache/yay" || failure "Cannot change directory to /home/$USER_NAME/.cache/yay"
@@ -910,8 +927,11 @@ function post-install () {
         sudo -u "$USER_NAME" makepkg -si --noconfirm
         cd ..
     done
-    
-    # ------------------------------- Login Manager ------------------------------ #
+```
+
+## Login Manager
+
+```bash
     #Check if /etc/lightdm.conf exists
     if [ -f "/etc/lightdm/lightdm.conf" ]; then
     
@@ -955,20 +975,24 @@ function post-install () {
             sleep 1s
         done
     fi
+```
 
+## Services
+
+```bash
     #Enabling services
     prompt_info "Enabling services..."
     for i in $SERVICES; do
         
         systemctl enable "$i" || { prompt_warning "Cannot enable $i service!"; echo ""; echo "$i" >> "$HOME/disabled_services.txt"; prompt_warning "Service added to $HOME/disabled_services.txt, Please enable it manually."; }
     done
+```
 
-    #Activate time synchronization
+## Time Synchronization
+
+```bash
     prompt_info "Activating time synchronization..."
     timedatectl set-ntp true
-
-    prompt_different "AUR configuration complete!"
-}
 ```
 
 # Main
@@ -1258,7 +1282,7 @@ DISK="$DISK_CHECK"
 Umount_
 ```
 
-## UEFI Check
+## UEFI Check & Grub Arguments
 
 This check is done according to <https://wiki.archlinux.org/title/Installation_guide#Verify_the_boot_mode>.
 
@@ -1323,7 +1347,9 @@ if echo "$PARTED_INFO" | head -1 | grep -w -q SSD; then
 fi
 ```
 
-## Automatic Partitioning
+## Partition Management
+
+### Automatic Partitioning
 
 ```bash
 #In the below link, you can find the answer for the question of - Why first partition generally starts from sector 2048 (1mib)? -
@@ -1598,7 +1624,7 @@ if output=$([ "$ENABLE_AUTO_PARTITIONING" == "true" ] && [ "$ANSWER" == "y" ] );
     fi
 ```
 
-## Manual Partition Selection
+### Manual Partition Selection
 
 ```bash
 #Continuation of "if output=$([ "$ENABLE_AUTO_PARTITIONING" == "true" ] && [ "$ANSWER" == "y" ] ); then..."
@@ -1762,7 +1788,11 @@ else
         SYSTEM_PARTITION="$PART_CHECK"
     fi
 fi
+```
 
+## Print Current Configuration
+
+```bash
 #Wait before using parted again in case the disk is old
 sleep 5s
 
@@ -1941,6 +1971,8 @@ genfstab -U "$MOUNT_PATH" >> "$MOUNT_PATH/etc/fstab"
 
 ## Setup
 
+### Various
+
 ```bash
 function setup () {
 
@@ -1997,10 +2029,11 @@ function setup () {
         printf "::1            localhost\n"
         printf "127.0.1.1      %s.localdomain    %s" "$DEVICE" "$DEVICE"
     } >> /etc/hosts
-    
-    
-    # --------------------------------- Initramfs -------------------------------- #
-    
+```
+
+### Initramfs
+
+```bash
     declare mkinitcpio=""
     
     if [ "$IS_ENCRYPT" == "true" ]; then
@@ -2045,9 +2078,11 @@ function setup () {
         nano /etc/mkinitcpio.conf
         clear
     fi
-    
-    # -------------------------------- Boot Loader ------------------------------- #
-    
+```
+
+### Boot loader
+
+```bash
     prompt_info "Installing grub..."
     grub-install $GRUB_ARGS
     
@@ -2112,7 +2147,11 @@ function setup () {
         printf "${LIGHT_GREEN}Continuing in ${LIGHT_CYAN}%s${NOCOLOUR}\033[0K\r" "$i"
         sleep 1s
     done
-    
+```
+
+### User management
+
+```bash
     #Enable sudo
     prompt_info "Enabling sudo..."
     declare sudoers=""
@@ -2151,8 +2190,11 @@ function setup () {
     prompt_info "Changing root pass..."
     echo "root:$ROOT_PASS" | chpasswd
 }
+```
 
+### Execute setup
 
+```bash
 #Export variables to be able to use in chroot
 export USER_NAME="$USER_NAME"
 export USER_PASS="$USER_PASS"
@@ -2192,7 +2234,7 @@ export -f setup
 arch-chroot "$MOUNT_PATH" /bin/bash -c "setup"
 ```
 
-## Post Installation
+## Execute post-install
 
 ```bash
 #Export additional variables

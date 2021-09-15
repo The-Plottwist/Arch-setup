@@ -73,9 +73,10 @@ In the script, change this:
 27 declare ENABLE_AUTO_PARTITIONING="true"
 ```
 
-## How to modify?
+## How to modify the code?
 
 You can read my manuals: [Breaking into pieces](https://github.com/The-Plottwist/Arch-setup/blob/main/Breaking-into-pieces.md) and [Before altering](https://github.com/The-Plottwist/Arch-setup/blob/main/Before-altering.md).
+Rest is up to you.
 
 ## Image Credentials
 
