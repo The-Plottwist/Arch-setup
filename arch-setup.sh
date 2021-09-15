@@ -1755,7 +1755,6 @@ function setup () {
     ln -sf /usr/share/zoneinfo/"$TIMEZONE" /etc/localtime
     
     #Locales
-    #TODO: Add this to README (locale change)
     declare locale=""
     locale=$(sed "s/#en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/g" /etc/locale.gen)
     
