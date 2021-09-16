@@ -31,7 +31,12 @@ Archlinux is a distro that it gives full control to anyone who wants to install 
 - And a few more...
 
 All of the packages are predefined and can be changed before running the script.
-For more information, visit my [Packages](https://github.com/The-Plottwist/Arch-setup/blob/main/Packages.md) manual.
+
+To list what packages are installed see: [Packages.md](https://github.com/The-Plottwist/Arch-setup/blob/main/Packages.md)
+
+## Default US Layout
+
+![alt text](assets/640px-KB_United_States-NoAltGr.svg.png)
 
 ## Usage
 
@@ -75,12 +80,14 @@ In the script, change this:
 
 ## How to modify the code?
 
-You can read my manuals: [Breaking into pieces](https://github.com/The-Plottwist/Arch-setup/blob/main/Breaking-into-pieces.md) and [Before altering](https://github.com/The-Plottwist/Arch-setup/blob/main/Before-altering.md).
+You can read: [Breaking-into-pieces.md](https://github.com/The-Plottwist/Arch-setup/blob/main/Breaking-into-pieces.md) and [Before-altering.md](https://github.com/The-Plottwist/Arch-setup/blob/main/Before-altering.md)
+
 Rest is up to you.
 
 ## Image Credentials
 
 Login screen photo *by Amir Esrafili*: <https://unsplash.com/photos/YP0nK_9TuC8>
+
 Desktop photo *by Bjorn Snelders*: <https://unsplash.com/photos/zNNPSqKRR2c>
 
 *Both photos are photoshopped by myself.*
