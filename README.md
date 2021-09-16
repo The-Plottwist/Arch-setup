@@ -32,23 +32,25 @@ Archlinux is a distro that it gives full control to anyone who wants to install 
 
 All of the packages are predefined and can be changed before running the script.
 
-To list what packages are installed see: [Packages.md](https://github.com/The-Plottwist/Arch-setup/blob/main/Packages.md)
+To see the package list read: [Packages.md](https://github.com/The-Plottwist/Arch-setup/blob/main/Packages.md)
 
 ## Default US Layout
+
+This is the default layout when archiso boots.
 
 ![alt text](assets/640px-KB_United_States-NoAltGr.svg.png)
 
 ## Usage
 
-*Script won't work if you don't have an active internet connection.*
+After booting into iso, do:
 
-**Enabling Internet Connection:**
+**Enable Internet Connection:**
 
 - If you have a wired connection, just type `dhcpcd` and test it with `ping archlinux.org -c 1`
 
 - Otherwise follow this guide: <https://www.linuxandubuntu.com/home/how-to-setup-a-wifi-in-arch-linux-using-terminal>
 
-**Cloning the Repository:**
+**Clone the Repository:**
 
 - Install git with `pacman -S git`
 
