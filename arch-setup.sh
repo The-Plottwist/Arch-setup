@@ -1149,7 +1149,7 @@ fi
 
 #Swap size
 declare -i swap_size=0
-swap_size=$(free --giga | grep Mem: | awk '{print $2}') #Take Gb, Treat GiB
+swap_size=$(free --giga | grep Mem: | awk '{print $2}')
 if (( swap_size <= 2 )); then
 
     swap_size="$swap_size*3"
@@ -1160,6 +1160,7 @@ elif (( swap_size > 8 )); then
 
     swap_size=$((( swap_size/2+swap_size )))
 fi
+swap_size="$swap_size*1024" #Convert to MiB
 
 # ------------------------------- Partitioning ------------------------------- #
 #In the below link, you can find the answer for the question of - Why first partition generally starts from sector 2048 (1mib)? -
@@ -1200,7 +1201,7 @@ if output=$([ "$ENABLE_AUTO_PARTITIONING" == "true" ] && [ "$ANSWER" == "y" ] );
         NEEDED_SIZE+=512 #ESP
     fi
     NEEDED_SIZE+=500 #BOOT
-    NEEDED_SIZE+=$((( swap_size*1024 ))) #SWAP (convert to mib)
+    NEEDED_SIZE+=$swap_size #SWAP (convert to mib)
     NEEDED_SIZE+=32768 #SYSTEM
 
     #If not enough space
@@ -1651,7 +1652,7 @@ if [ "$IS_ENCRYPT" == "true" ]; then
     prompt_info "Making logical volumes..."
     pvcreate /dev/mapper/cryptlvm
     vgcreate "$VOLGROUP" /dev/mapper/cryptlvm
-    lvcreate -L "$swap_size"G "$VOLGROUP" -n swap
+    lvcreate -L "$swap_size" "$VOLGROUP" -n swap
     lvcreate -L 32G "$VOLGROUP" -n root
     lvcreate -l 100%FREE "$VOLGROUP" -n home
 
