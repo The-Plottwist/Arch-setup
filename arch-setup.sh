@@ -1147,6 +1147,10 @@ if echo "$PARTED_INFO" | head -1 | grep -w -q SSD; then
     fi
 fi
 
+#Swap size
+declare -i swap_size=0
+swap_size=$(free --giga | grep Mem: | awk '{print $2}') #Take Gb, Treat GiB
+swap_size="$swap_size*2"
 
 # ------------------------------- Partitioning ------------------------------- #
 #In the below link, you can find the answer for the question of - Why first partition generally starts from sector 2048 (1mib)? -
@@ -1172,7 +1176,7 @@ if output=$([ "$ENABLE_AUTO_PARTITIONING" == "true" ] && [ "$ANSWER" == "y" ] );
     #BIOS Grub - 1mib
     #EFI System Partition [ESP] - 512mib                https://wiki.archlinux.org/title/EFI_system_partition#Create_the_partition
     #Boot - 500mib
-    #Swap - 8gib                                        https://wiki.archlinux.org/title/Dm-crypt/Encrypting_an_entire_system#LVM_on_LUKS
+    #Swap - TOTAL_RAM*2                                 https://wiki.gentoo.org/wiki/Handbook:AMD64/Installation/Disks#What_about_swap_space.3F
     #System - 32gib (If seperate)
     #Home - All of the available space
     
@@ -1187,7 +1191,7 @@ if output=$([ "$ENABLE_AUTO_PARTITIONING" == "true" ] && [ "$ANSWER" == "y" ] );
         NEEDED_SIZE+=512 #ESP
     fi
     NEEDED_SIZE+=500 #BOOT
-    NEEDED_SIZE+=8192 #SWAP
+    NEEDED_SIZE+=$(((swap_size*1024))) #SWAP (convert to mib)
     NEEDED_SIZE+=32768 #SYSTEM
 
     #If not enough space
@@ -1252,7 +1256,12 @@ if output=$([ "$ENABLE_AUTO_PARTITIONING" == "true" ] && [ "$ANSWER" == "y" ] );
         sleep 1s
     done
 
-
+    #Partition start, ends
+    declare -i swap_e=0
+    declare -i system_s=0
+    declare -i system_e=0
+    declare -i home_s=0
+    
     if [ "$IS_ENCRYPT" == "true" ]; then
     
         if [ "$IS_UEFI" == "true" ]; then #Encrypt true, UEFI=true
@@ -1316,12 +1325,17 @@ if output=$([ "$ENABLE_AUTO_PARTITIONING" == "true" ] && [ "$ANSWER" == "y" ] );
         
             if [ "$IS_SEPERATE" == "true" ]; then #Encrypt false, UEFI=true, is seperate=true
                 
+                swap_e=$swap_size+1015
+                system_s=$swap_e+1
+                system_e=$system_s+32768
+                home_s=$system_e+1
+                
                 parted "$DISK" --script "mktable gpt" \
                                         "mkpart \"EFI System Partition\" 1mib 513mib" \
                                         "mkpart BOOT 514mib 1014mib" \
-                                        "mkpart SWAP 1015mib 9207mib" \
-                                        "mkpart SYSTEM 9208mib 41976mib" \
-                                        "mkpart HOME 41977mib -1"
+                                        "mkpart SWAP 1015mib \"$swap_e\"mib"
+                                        "mkpart SYSTEM \"$system_s\"mib \"$system_e\"mib" \
+                                        "mkpart HOME \"$home_s\"mib -1"
 
                 #ESP
                 parted "$DISK" --script "set 1 boot on" \
@@ -1336,11 +1350,14 @@ if output=$([ "$ENABLE_AUTO_PARTITIONING" == "true" ] && [ "$ANSWER" == "y" ] );
                 HOME_PARTITION="$DISK"5
             else #Encrypt false, UEFI=true, is seperate=false
             
+                swap_e=$swap_size+1015
+                system_s=$swap_e+1
+            
                 parted "$DISK" --script "mktable gpt" \
                                         "mkpart \"EFI System Partition\" 1mib 513mib" \
                                         "mkpart BOOT 514mib 1014mib" \
-                                        "mkpart SWAP 1015mib 9207mib" \
-                                        "mkpart SYSTEM 9208mib -1"
+                                        "mkpart SWAP 1015mib \"$swap_e\"mib" \
+                                        "mkpart SYSTEM \"$system_s\"mib -1"
 
                 #ESP
                 parted "$DISK" --script "set 1 boot on" \
@@ -1359,12 +1376,17 @@ if output=$([ "$ENABLE_AUTO_PARTITIONING" == "true" ] && [ "$ANSWER" == "y" ] );
                 
                 if [ "$PARTITION_TABLE" == "gpt" ]; then #Encrypt false, UEFI=false, is seperate=true, partition table=gpt
                 
+                    swap_e=$swap_size+504
+                    system_s=$swap_e+1
+                    system_e=$system_s+32768
+                    home_s=$system_e+1
+                
                     parted "$DISK" --script "mktable gpt" \
                                             "mkpart GRUB 1mib 2mib" \
                                             "mkpart BOOT 3mib 503mib" \
-                                            "mkpart SWAP 504mib 8696mib" \
-                                            "mkpart SYSTEM 8697mib 41465mib" \
-                                            "mkpart HOME 41466mib -1"
+                                            "mkpart SWAP 504mib \"$swap_e\"mib" \
+                                            "mkpart SYSTEM \"$system_s\"mib \"$system_e\"mib" \
+                                            "mkpart HOME \"$home_s\"mib -1"
                     
                     parted "$DISK" --script "set 1 bios_grub on"
                     
@@ -1374,12 +1396,17 @@ if output=$([ "$ENABLE_AUTO_PARTITIONING" == "true" ] && [ "$ANSWER" == "y" ] );
                     HOME_PARTITION="$DISK"5
                 else #Encrypt false, UEFI=false, is seperate=true, partition table=mbr
                 
+                    swap_e=$swap_size+503
+                    system_s=$swap_e+1
+                    system_e=$system_s+32768
+                    home_s=$system_e+1
+                
                     parted "$DISK" --script "mktable msdos" \
                                             "mkpart primary 1mib 501mib" \
                                             "mkpart extended 502mib -1" \
-                                            "mkpart logical 503mib 8695mib" \
-                                            "mkpart logical 8696mib 41464mib" \
-                                            "mkpart logical 41465mib -1"
+                                            "mkpart logical 503mib \"$swap_e\"mib" \
+                                            "mkpart logical \"$system_s\"mib \"$system_e\"mib" \
+                                            "mkpart logical \"$home_s\"mib -1"
                     
                     BOOT_PARTITION="$DISK"1
                     #Warning! Logical partitions start from 5.
@@ -1392,11 +1419,14 @@ if output=$([ "$ENABLE_AUTO_PARTITIONING" == "true" ] && [ "$ANSWER" == "y" ] );
             
                 if [ "$PARTITION_TABLE" == "gpt" ]; then #Encrypt false, UEFI=false, is seperate=false, partition table=gpt
                 
+                    swap_e=$swap_size+504
+                    system_s=$swap_e+1
+                
                     parted "$DISK" --script "mktable gpt" \
                                             "mkpart GRUB 1mib 2mib" \
                                             "mkpart BOOT 3mib 503mib" \
-                                            "mkpart SWAP 504mib 8696mib" \
-                                            "mkpart SYSTEM 8697mib -1"
+                                            "mkpart SWAP 504mib \"$swap_e\"mib" \
+                                            "mkpart SYSTEM \"$system_s\"mib -1"
                                         
                     parted "$DISK" --script "set 1 bios_grub on"
                     
@@ -1405,11 +1435,14 @@ if output=$([ "$ENABLE_AUTO_PARTITIONING" == "true" ] && [ "$ANSWER" == "y" ] );
                     SYSTEM_PARTITION="$DISK"4
                 else #Encrypt false, UEFI=false, is seperate=false, partition table=mbr
                 
+                    swap_e=$swap_size+503
+                    system_s=$swap_e+1
+                
                     parted "$DISK" --script "mktable msdos" \
                                             "mkpart primary 1mib 501mib" \
                                             "mkpart extended 502mib -1" \
-                                            "mkpart logical 503mib 8695mib" \
-                                            "mkpart logical 8696mib -1"
+                                            "mkpart logical 503mib \"$swap_e\"mib" \
+                                            "mkpart logical \"$system_s\"mib -1"
                     
                     BOOT_PARTITION="$DISK"1
                     #Warning! Logical partitions start from 5.
@@ -1609,7 +1642,7 @@ if [ "$IS_ENCRYPT" == "true" ]; then
     prompt_info "Making logical volumes..."
     pvcreate /dev/mapper/cryptlvm
     vgcreate "$VOLGROUP" /dev/mapper/cryptlvm
-    lvcreate -L 8G "$VOLGROUP" -n swap
+    lvcreate -L "$swap_size"G "$VOLGROUP" -n swap
     lvcreate -L 32G "$VOLGROUP" -n root
     lvcreate -l 100%FREE "$VOLGROUP" -n home
 
