@@ -1150,7 +1150,16 @@ fi
 #Swap size
 declare -i swap_size=0
 swap_size=$(free --giga | grep Mem: | awk '{print $2}') #Take Gb, Treat GiB
-swap_size="$swap_size*2"
+if (( swap_size <= 2 )); then
+
+    swap_size="$swap_size*3"
+elif (( swap_size <= 8 )); then
+
+    swap_size="$swap_size*2"
+elif (( swap_size > 8 )); then
+
+    swap_size=$((( swap_size/2+swap_size )))
+fi
 
 # ------------------------------- Partitioning ------------------------------- #
 #In the below link, you can find the answer for the question of - Why first partition generally starts from sector 2048 (1mib)? -
@@ -1176,7 +1185,7 @@ if output=$([ "$ENABLE_AUTO_PARTITIONING" == "true" ] && [ "$ANSWER" == "y" ] );
     #BIOS Grub - 1mib
     #EFI System Partition [ESP] - 512mib                https://wiki.archlinux.org/title/EFI_system_partition#Create_the_partition
     #Boot - 500mib
-    #Swap - TOTAL_RAM*2                                 https://wiki.gentoo.org/wiki/Handbook:AMD64/Installation/Disks#What_about_swap_space.3F
+    #Swap - differs                                     https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/6/html/installation_guide/s2-diskpartrecommend-x86
     #System - 32gib (If seperate)
     #Home - All of the available space
     
@@ -1191,7 +1200,7 @@ if output=$([ "$ENABLE_AUTO_PARTITIONING" == "true" ] && [ "$ANSWER" == "y" ] );
         NEEDED_SIZE+=512 #ESP
     fi
     NEEDED_SIZE+=500 #BOOT
-    NEEDED_SIZE+=$(((swap_size*1024))) #SWAP (convert to mib)
+    NEEDED_SIZE+=$((( swap_size*1024 ))) #SWAP (convert to mib)
     NEEDED_SIZE+=32768 #SYSTEM
 
     #If not enough space
