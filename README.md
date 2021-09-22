@@ -32,9 +32,9 @@ Archlinux is a distro that it gives full control to anyone who wants to install 
 
 All of the packages are predefined and can be changed before running the script.
 
-To see the package list read: [Packages.md](https://github.com/The-Plottwist/Arch-setup/blob/main/Packages.md)
+To see the package list look: [Packages.md](https://github.com/The-Plottwist/Arch-setup/blob/main/Packages.md)
 
-## Default US Layout
+## US Layout
 
 This is the default layout when archiso boots.
 
