@@ -2,10 +2,12 @@
 
 This file is only for demonstrative and understanding purposes and includes mediocre changes in the code. (Do not expect it to run)
 
-### Table of contents
+**Source code version:** v1.0.1
+
+## Table of contents
 
 - [Breaking into Pieces](#breaking-into-pieces)
-    - [Table of contents](#table-of-contents)
+  - [Table of contents](#table-of-contents)
   - [Globals](#globals)
   - [Packages](#packages)
   - [Services](#services)
