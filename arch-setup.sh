@@ -49,7 +49,6 @@ declare GRUB_ARGS=""
 
 declare PARTITION_TABLE=""
 declare DISK=""
-declare DISK_SIZE_TIB=""
 declare DISK_SIZE_MIB=""
 declare IS_UEFI=""
 declare IS_ENCRYPT=""
@@ -318,7 +317,7 @@ function disk_check () {
             
             echo
             prompt_warning "The disk '$input' couldn't found."
-            printf "${LIGHT_RED}Please try again: ${NOCOLOUR}"
+            printf "${LIGHT_CYAN}Please give a ${LIGHT_RED}PATH${LIGHT_CYAN}: ${NOCOLOUR}"
             read -e -r -p " " input
         else
         
@@ -352,7 +351,7 @@ function partition_check () {
         
             echo
             prompt_warning "Partition '$input' couldn't found."
-            printf "${LIGHT_RED}Please try again: ${NOCOLOUR}"
+            printf "${LIGHT_CYAN}Please give a ${LIGHT_RED}PATH${LIGHT_CYAN}: ${NOCOLOUR}"
             read -e -r -p " " input
         else
         
@@ -417,7 +416,10 @@ function list {
         declare -i n=0
     
         printf "$message\n"
-        printf "${LIGHT_RED}(q: Quit from listing, /: search forward, ?: search backward, h: Help, Navigation: ↑↓, pg-up, pg-down)\n\n"
+        echo
+        prompt_different "PRESS (Q) TO QUIT LISTING!"
+        echo
+        printf "${LIGHT_RED}(/: search forward, ?: search backward, h: Help, Navigation: ↑↓, pg-up, pg-down)\n\n"
         
         for i in $list; do
     
@@ -425,6 +427,10 @@ function list {
             printf "${LIGHT_CYAN}%s ${NOCOLOUR}" "$n"
             printf "${PURPLE}%s${NOCOLOUR}\n" "$i"
         done
+        echo
+        echo
+        prompt_different "PRESS (Q) TO QUIT LISTING!"
+        echo
     } | less --raw-control-chars
 }
 
@@ -970,7 +976,7 @@ while true; do
 done
 
 #Device name
-prompt_question "Please enter a device name:"
+printf "${LIGHT_CYAN}Please give your device a ${LIGHT_RED}HOST${LIGHT_CYAN} name:"
 read -e -r -p " " DEVICE
 
 VOLGROUP="$DEVICE"VolGroup
@@ -1074,7 +1080,7 @@ TIMEZONE=$(echo "$l_timezones" | head -"$NUMBER_CHECK" | tail -1)
 echo
 printf "${LIGHT_GREEN}Your timezone is: ${LIGHT_CYAN}%s${NOCOLOUR}" "$TIMEZONE"
 
-sleep 3s
+sleep 2s
 
 #Get Disk
 clear
@@ -1113,9 +1119,6 @@ PARTED_INFO="$(parted "$DISK" --script "u mib" \ "print")"
 
 #Get disk size in MiB and subtract the extension
 DISK_SIZE_MIB=$(echo "$PARTED_INFO" | grep "Disk $DISK:" | awk '{print $3}' | sed s/[A-Za-z]//g)
-
-#Convert it to TiB
-DISK_SIZE_TIB=$(( DISK_SIZE_MIB/(1024*1024) ))
 
 #Get Partition Table
 PARTITION_TABLE=$(echo "$PARTED_INFO" | grep "Partition Table:" | awk '{print $3}')
@@ -1158,8 +1161,8 @@ fi
 if output=$([ "$ENABLE_AUTO_PARTITIONING" == "true" ] && [ "$ANSWER" == "y" ] ); then
 
 
-    #GPT is required for disks that are bigger than 2TiB
-    if (( DISK_SIZE_TIB > 2 )); then
+    #GPT is required for disks that are larger than 2TB
+    if (( ! DISK_SIZE_MIB < 1907347 )); then
 
         PARTITION_TABLE="gpt"
     fi
@@ -1423,11 +1426,13 @@ else #Manual partition selection
     if [ "$PARTITION_TABLE" == "other" ]; then
     
         prompt_warning "ERROR! Partition table not supported! "
+        printf "${YELLOW}For manual partitioning, see: ${PURPLE}https://github.com/The-Plottwist/Arch-setup/blob/main/Partitioning-manual.md${NOCOLOUR}\n\n"
         failure "Please use auto partitioning or format it with a correct table (MBR or GPT)."
     fi
     
     #Inform the user about needed partitions
     clear
+    printf "${YELLOW}For manual partitioning, see: ${PURPLE}https://github.com/The-Plottwist/Arch-setup/blob/main/Partitioning-manual.md${NOCOLOUR}\n\n"
     prompt_info "Needed partitions:"
     printf "\033[1A\033[2K\r" #Delete unnecessary carriage returns
     
@@ -1481,32 +1486,22 @@ else #Manual partition selection
         done
     fi
 
-
-    #BIOS GRUB partition
-    if output=$([ "$PARTITION_TABLE" == "gpt" ] && [ "$IS_UEFI" == "false" ]); then
-    
-        declare -i last_partition=0
-        declare print=""
-        
-        print=$(parted --script "$DISK" "print")
-        last_partition=$(echo "$print" | awk '{print $1}' | tail -1)
-        
-        echo
-        echo "$print"
-        
-        echo
-        printf "${LIGHT_CYAN}Please specify the number for the Grub parition ${LIGHT_RED}(1mib partition advised)${LIGHT_CYAN}: ${NOCOLOUR}"
-        number_check "$last_partition"
-        
-        parted "$DISK" --script "set $NUMBER_CHECK bios_grub on"
-        sleep 2s
-        clear
-    fi
-
-    
     #Print the disk
     echo
     lsblk "$DISK" -o +path,partlabel
+
+    #BIOS GRUB partition
+    if output=$([ "$PARTITION_TABLE" == "gpt" ] && [ "$IS_UEFI" == "false" ]); then
+        
+        declare p_bg=""
+        
+        partition_check "BIOS Grub Partition"
+        p_bg=$(echo "$PART_CHECK" | sed "s/[A-Za-z]//g" | sed "s/\///g")
+        
+        parted "$DISK" --script "set $p_bg bios_grub on"
+        sleep 2s
+        clear
+    fi
 
     #Get ESP
     if [ "$IS_UEFI" == "true" ]; then
@@ -1579,7 +1574,7 @@ else #Manual partition selection
 fi
 
 #Wait before using parted again in case the disk is old
-sleep 5s
+sleep 3s
 
 #Print current configuration
 clear
