@@ -1150,6 +1150,7 @@ fi
 #Swap size
 declare -i swap_size=0
 swap_size=$(free --giga | grep Mem: | awk '{print $2}')
+
 if (( swap_size <= 2 )); then
 
     swap_size="$swap_size*3"
@@ -1201,7 +1202,7 @@ if output=$([ "$ENABLE_AUTO_PARTITIONING" == "true" ] && [ "$ANSWER" == "y" ] );
         NEEDED_SIZE+=512 #ESP
     fi
     NEEDED_SIZE+=500 #BOOT
-    NEEDED_SIZE+=$swap_size #SWAP (convert to mib)
+    NEEDED_SIZE+=$swap_size #SWAP
     NEEDED_SIZE+=32768 #SYSTEM
 
     #If not enough space
@@ -1538,7 +1539,8 @@ else #Manual partition selection
         
         declare p_bg=""
         
-        partition_check "BIOS Grub Partition"
+        prompt_partition "BIOS Grub"
+        partition_check
         p_bg=$(echo "$PART_CHECK" | sed "s/[A-Za-z]//g" | sed "s/\///g")
         
         parted "$DISK" --script "set $p_bg bios_grub on"
