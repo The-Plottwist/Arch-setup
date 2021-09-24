@@ -102,4 +102,6 @@ Desktop photo *by Bjorn Snelders*: <https://unsplash.com/photos/zNNPSqKRR2c>
 
 - <https://wiki.archlinux.org/title/EFI_system_partition#Typical_mount_points> (Option three)
 
+- <https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/6/html/installation_guide/s2-diskpartrecommend-x86> (For swap space allocation)
+
 - <https://wiki.archlinux.org/title/Dm-crypt/Encrypting_an_entire_system#LVM_on_LUKS>

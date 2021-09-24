@@ -18,14 +18,17 @@
         - [GPT](#gpt)
         - [MBR](#mbr)
       - [C. Needed Partitions](#c-needed-partitions)
-      - [D. Partition Sizes](#d-partition-sizes)
+      - [D. Recommended Partition Sizes](#d-recommended-partition-sizes)
     - [(Practice)](#practice)
+      - [Parted Output](#parted-output)
       - [Unit of Measurement (Optional)](#unit-of-measurement-optional)
       - [Partition table (Optional)](#partition-table-optional)
-      - [Schemes](#schemes)
+      - [Partitioning Example](#partitioning-example)
+      - [Example Scenerios](#example-scenerios)
         - [A. UEFI](#a-uefi)
         - [B. Legacy BIOS + GPT](#b-legacy-bios--gpt)
         - [C. Legacy BIOS + MBR](#c-legacy-bios--mbr)
+    - [Quit](#quit)
 
 ## Tools
 
@@ -95,7 +98,7 @@ There are two boot modes:
 
 To know which mode you are in, type: `ls /sys/firmware/efi/efivars`.
 
-If you successfully list the contents of that file, then you are in `UEFI` mode.
+If you successfully run this command, then you are in `UEFI` mode.
 
 If you encounter with this:
 
@@ -111,11 +114,11 @@ Partitioning is a scheming process that allows the use of a data storage device.
 
 #### A. Partition tables
 
-There are two suitable partition tables for linux. `MBR` and `GPT`.
+There are two suitable partition tables for linux: `MBR` and `GPT`.
 
-`MBR` (a.k.a `msdos`) is the old fashioned way of handling partitions.
+- `MBR` (a.k.a `msdos`) is the old fashioned way of handling partitions.
 
-`GPT` on the other hand is newer and offers more flexibility.
+- `GPT` on the other hand is newer and offers more flexibility.
 
 *(For more information about partition tables, visit: <https://wiki.gentoo.org/wiki/Handbook:AMD64/Installation/Disks#Partition_tables>)*
 
@@ -148,24 +151,18 @@ All partitions differ each other from their numbers and allocated regions. There
 
 #### C. Needed Partitions
 
-|                   | `EFI System Partition (ESP)` | `BIOS Grub` | `BOOT` | `SWAP` | `SYSTEM` | `HOME` |
-| ----------------- | :--------------------------: | :---------: | :----: | :----: | :------: | :----: |
-| UEFI              | x                            |             | x      | x      | x        | ±      |
-| Legacy BIOS + GPT |                              | x           | x      | x      | x        | ±      |
-| Legacy BIOS + MBR |                              |             | x      | x      | x        | ±      |
+|                   | EFI System Partition (ESP) | BIOS Grub | BOOT | SWAP | SYSTEM | HOME |
+| ----------------- | :------------------------: | :-------: | :--: | :--: | :----: | :--: |
+| UEFI              | x                          |           | x    | x    | x      | ±    |
+| Legacy BIOS + GPT |                            | x         | x    | x    | x      | ±    |
+| Legacy BIOS + MBR |                            |           | x    | x    | x      | ±    |
 
-#### D. Partition Sizes
+#### D. Recommended Partition Sizes
 
-- `BIOS Grub`: `1MiB`
-- `EFI System Partition`: `512MiB` recommended
-- `BOOT`: `500MiB` recommended
-- `SWAP`:
-  - [Red Hat guidelines](https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/6/html/installation_guide/s2-diskpartrecommend-x86) *(I use this one)*
-  - [Ubuntu guidelines](https://help.ubuntu.com/community/SwapFaq#How_much_swap_do_I_need.3F)
-- `SYSTEM`:
-  - if seperate: `32GiB` recommended
-  - else: Rest of the disk
-- `HOME`: Rest of the disk
+| EFI Sysetm Partition (ESP) | BIOS Grub | BOOT   | SWAP                                                                                                                                            | SYSTEM              | HOME             |
+| :------------------------: | :-------: | :----: | :---------------------------------------------------------------------------------------------------------------------------------------------: | :-----------------: | :--------------: |
+| 512MiB                     | 1MiB      | 500MiB | [Red Hat guidelines](https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/6/html/installation_guide/s2-diskpartrecommend-x86) | 32GiB (if seperate) | Rest of the disk |
+|                            |           |        | [Ubuntu guidelines](https://help.ubuntu.com/community/SwapFaq#How_much_swap_do_I_need.3F)                                                       | Rest of the disk    |                  |
 
 ### (Practice)
 
@@ -175,15 +172,26 @@ To enter `parted`'s dialog mode, type: `parted YOUR_TARGET_DEVICE`
 
 ![parted-welcome](assets/manuals/partitioning/parted-welcome.png)
 
-and to see your current configuration, type `print`:
+#### Parted Output
+
+To see your current configuration, type `print`:
 
 ![parted-print](assets/manuals/partitioning/parted-print.png)
 
-*Note 1: You can shorten these commands (e.g `print` to `p` or `mktable` to `mkt`)*
+*Note: You can shorten your commands (e.g. `p` instead of `print`)*
 
-*Note 2: If you encounter a warning like the image below, please follow these descriptions: <https://something.fail/blog/parted-multi-partition-alignment>*
+In the above image, it is saying `Partition Table: msdos` which means our partition table is `MBR`. Hence `logical` partitions are starting from five.
 
-![parted-misalign](assets/manuals/partitioning/parted-misalign.png)
+If it were to belong a `GPT` partition table, it would look like this:
+
+![parted-print](assets/manuals/partitioning/parted-print2.png)
+
+As you can see, there is a `Name` column instead of `Type`.
+
+All columns seems pretty self-explanatory except for `Number` and `Flags` columns.
+
+- `Number`: Indicates partition number.
+- `Flags`: Indicates various options for that partition. *(To see all flags, please visit: <https://www.gnu.org/software/parted/manual/html_node/set.html>)*
 
 #### Unit of Measurement (Optional)
 
@@ -191,13 +199,15 @@ Type `unit mib` to change your unit of measurement to `MiB`:
 
 ![parted-unit](assets/manuals/partitioning/parted-unit.png)
 
-or `unit gib`:
+or `unit gib` to `GiB`:
 
 ![parted-unit2](assets/manuals/partitioning/parted-unit2.png)
 
 #### Partition table (Optional)
 
-Type `mktable gpt`:
+Syntax: `mktable PARTITION_TABLE`
+
+For example, type `mktable gpt`:
 
 ![parted-gpt](assets/manuals/partitioning/parted-gpt.png)
 
@@ -205,44 +215,70 @@ After `print`, it should look like this:
 
 ![parted-gpt-print1](assets/manuals/partitioning/parted-gpt-print1.png)
 
-#### Schemes
+#### Partitioning Example
 
-*Note 1: I have `8GB` of `RAM`. According to [Red Hat guidelines](https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/6/html/installation_guide/s2-diskpartrecommend-x86) my needed swap size is `8 * 2 = 16GB`. (So I will use `16GiB`)*
+Let's say you don't want to delete your partitions and your partition scheme is like this:
+
+![parted-print3](assets/manuals/partitioning/parted-print3.png)
+
+To make a new partition, `mktable NAME/TYPE START END` command is used. To choose your partition's starting location, you can either benefit from `MiB` output or `GiB` output. They differ from each other by precision (i.e. there will be unallocated space if `GiB` is used).
+
+So your command would *definitely* be `mkpart "My Favourite Partition" 48.7gib 58.7gib`. Let's look how it seems:
+
+![parted-example-gib](assets/manuals/partitioning/parted-example-gib.png)
+
+*(For my system, there is `103MiB` unallocated space left between fourth and fifth partitions.)*
+
+Here is another example. This time we will use `MiB`:
+
+![parted-example-mib](assets/manuals/partitioning/parted-example-mib.png)
+
+#### Example Scenerios
+
+You don't need to `set` flags nor make a file system. `arch-setup` will make them for you.
+
+*Note 1: I have `8GB` of `RAM`. According to [Red Hat guidelines](https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/6/html/installation_guide/s2-diskpartrecommend-x86) my needed swap size is `8 * 2 = 16GB`. (therefore, I will use `16GiB`)*
 
 *Note 2: Lines starting with `(parted)` are my typed in commands.*
 
-*Note 3: Parted accepts unit specification while making partitions.*
+*Note 3: Parted accepts unit specification while making partitions. (`250gib`, `250mib`, `250` all are acceptable)*
 
-*Note 4: You don't have to start from `1MiB` necessarily. Instead, you can start from your last partition's end unit + 1 (e.g: `985 + 1` in `MiB` or `37.8 + 0.1` in `GiB`)*
+*Note 4: `-1` means rest of the disk.*
+
+*Note 5: If you encounter a warning likewise the image below, please follow these descriptions: <https://something.fail/blog/parted-multi-partition-alignment>*
+
+![parted-misalignment](assets/manuals/partitioning/parted-misalignment.png)
 
 ##### A. UEFI
 
-Syntax: `mkpart PARTITION_NAME START END`
+Syntax: `mkpart NAME START END`
 
 ![parted-uefi](assets/manuals/partitioning/parted-uefi.png)
 
-`GiB` output:
+result:
 
-![parted-uefi-mib](assets/manuals/partitioning/parted-uefi-gib.png)
-
-`MiB` output:
-
-![parted-uefi-mib](assets/manuals/partitioning/parted-uefi-mib.png)
+![parted-uefi-gib](assets/manuals/partitioning/parted-uefi-gib.png)
 
 ##### B. Legacy BIOS + GPT
 
-Syntax: `mkpart PARTITION_NAME START END`
+Syntax: `mkpart NAME START END`
 
 ![parted-bios-gpt1](assets/manuals/partitioning/parted-bios-gpt1.png)
 
-`GiB` output:
+result:
 
-![parted-bios-gpt1](assets/manuals/partitioning/parted-bios-gpt2.png)
-
-`MiB` output:
-
-![parted-bios-gpt1](assets/manuals/partitioning/parted-bios-gpt3.png)
+![parted-bios-gpt2](assets/manuals/partitioning/parted-bios-gpt2.png)
 
 ##### C. Legacy BIOS + MBR
 
-Syntax: `mkpart PARTITION_TYPE START END`
+Syntax: `mkpart TYPE START END`
+
+![parted-bios-mbr1](assets/manuals/partitioning/parted-bios-mbr1.png)
+
+result:
+
+![parted-bios-mbr2](assets/manuals/partitioning/parted-bios-mbr2.png)
+
+### Quit
+
+type: `quit` or `q`
