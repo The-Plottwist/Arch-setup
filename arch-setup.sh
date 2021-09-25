@@ -345,7 +345,7 @@ function partition_check () {
     fi
 
     #Use awk to remove unnecessary spaces
-    while ! output=$(lsblk -o type,path "$DISK" | awk '{print $1,$2}' | grep -v "disk" | grep -w "$input"); do
+    while ! output=$( { lsblk -o type,path "$DISK" | awk '{print $1,$2}' | grep -v "disk" | grep -w "$input"; } && [ -n "$input" ] ); do
     
         if [ "$is_argument" == "false" ]; then
         
@@ -406,6 +406,8 @@ function number_check () {
 #This is similar to "cat -n ... | less" command
 function list {
 
+    clear
+
     declare list=""
     declare message=""
     
@@ -427,7 +429,6 @@ function list {
             printf "${LIGHT_CYAN}%s ${NOCOLOUR}" "$n"
             printf "${PURPLE}%s${NOCOLOUR}\n" "$i"
         done
-        echo
         echo
         prompt_different "PRESS (Q) TO QUIT LISTING!"
         echo
@@ -976,7 +977,8 @@ while true; do
 done
 
 #Device name
-printf "${LIGHT_CYAN}Please give your device a ${LIGHT_RED}HOST${LIGHT_CYAN} name:"
+echo
+printf "${LIGHT_CYAN}Please give your device a ${LIGHT_RED}HOST${LIGHT_CYAN} name:${NOCOLOUR}"
 read -e -r -p " " DEVICE
 
 VOLGROUP="$DEVICE"VolGroup
@@ -1252,18 +1254,29 @@ if output=$([ "$ENABLE_AUTO_PARTITIONING" == "true" ] && [ "$ANSWER" == "y" ] );
     else
     
         IS_ENCRYPT="false"
+
+        prompt_question "Do you want seperate home and system partitions? (y/n):"
+        yes_no
+        if [ "$ANSWER" == "y" ]; then
+        
+            IS_SEPERATE="true"
+        else
+        
+            IS_SEPERATE="false"
+        fi
     fi
 
 
     # ---------------------------------------------------------------------------- #
     #                        Countdown before hard disk wipe                       #
     # ---------------------------------------------------------------------------- #
-    clear
     for i in {10..0}; do
 
-        printf "${LIGHT_RED}DANGER! Hard disk will be WIPED in: ${LIGHT_CYAN}%s${NOCOLOUR}\033[0K\r" "$i"
+        clear
+        printf "${LIGHT_RED}DANGER! your hard disk will be WIPED in: ${LIGHT_CYAN}%s${NOCOLOUR}" "$i"
         echo
-        printf "${LIGHT_RED}- You can quit with Ctrl-C -${NOCOLOUR}\033[0K\r" "$i"
+        echo
+        printf "${LIGHT_GREEN}- You can quit with Ctrl-C -${NOCOLOUR}"
         sleep 1s
     done
 
@@ -1321,17 +1334,6 @@ if output=$([ "$ENABLE_AUTO_PARTITIONING" == "true" ] && [ "$ANSWER" == "y" ] );
         fi
     else
     
-        prompt_question "Do you want seperate home and system partitions? (y/n):"
-        yes_no
-        if [ "$ANSWER" == "y" ]; then
-        
-            IS_SEPERATE="true"
-        else
-        
-            IS_SEPERATE="false"
-        fi
-        
-        
         if [ "$IS_UEFI" == "true" ]; then
         
             if [ "$IS_SEPERATE" == "true" ]; then #Encrypt false, UEFI=true, is seperate=true
@@ -1538,14 +1540,12 @@ else #Manual partition selection
     if output=$([ "$PARTITION_TABLE" == "gpt" ] && [ "$IS_UEFI" == "false" ]); then
         
         declare p_bg=""
-        
+
         prompt_partition "BIOS Grub"
         partition_check
         p_bg=$(echo "$PART_CHECK" | sed "s/[A-Za-z]//g" | sed "s/\///g")
-        
+
         parted "$DISK" --script "set $p_bg bios_grub on"
-        sleep 2s
-        clear
     fi
 
     #Get ESP
