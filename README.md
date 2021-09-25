@@ -6,7 +6,7 @@ Archlinux is a distro that it gives full control to anyone who wants to install 
 
 ## Features
 
-*It provides a complete system installation which can be boiled down to:*
+*`arch-setup.sh` provides a complete system installation which can be boiled down to:*
 
 - Auto partitioning [[disabled by default](#how-to-enable-auto-partitioningencrypting)]
 
@@ -32,17 +32,17 @@ Archlinux is a distro that it gives full control to anyone who wants to install 
 
 All of the packages are predefined and can be changed before running the script.
 
-To see the package list look: [Packages.md](https://github.com/The-Plottwist/Arch-setup/blob/main/Packages.md)
+To see the package list, please read: [Packages.md](https://github.com/The-Plottwist/Arch-setup/blob/main/Packages.md)
 
 ## US Layout
 
 This is the default layout when archiso boots.
 
-![alt text](assets/640px-KB_United_States-NoAltGr.svg.png)
+![alt text](assets/other/640px-KB_United_States-NoAltGr.svg.png)
 
 ## Usage
 
-After booting into iso, do:
+After [booting into the live environment](https://wiki.archlinux.org/title/Installation_guide#Boot_the_live_environment), do:
 
 **Enable Internet Connection:**
 
@@ -52,13 +52,13 @@ After booting into iso, do:
 
 **Clone the Repository:**
 
-- Install git with `pacman -S git`
+- Install git: `pacman -S git`
 
-- Clone the repo with `git clone https://github.com/The-Plottwist/Arch-setup`
+- Clone the repo: `git clone https://github.com/The-Plottwist/Arch-setup`
 
-- Change your directory with `cd Arch-setup` (This is necessary for background images)
+- Change your directory to cloned repo: `cd Arch-setup` (This is necessary for background images)
 
-- Run the script with `./arch-setup.sh`
+- Run the script: `./arch-setup.sh`
 
 ## How to enable auto partitioning/encrypting?
 
@@ -71,7 +71,7 @@ In the script, change this:
 27 #declare ENABLE_AUTO_PARTITIONING="true"
 ```
 
- to this:
+to this:
 
 ```bash
 24 #Auto partitioning wipes hard disk entirely, therefore it is disabled by default.
