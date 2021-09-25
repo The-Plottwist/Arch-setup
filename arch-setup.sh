@@ -885,7 +885,7 @@ prompt_different "You can modify this script to your needs, otherwise XFCE will 
 echo
 echo
 
-printf "${LIGHT_BLUE}If you encounter a problem or want to stop the command, you can press ${LIGHT_CYAN}Ctrl-C${LIGHT_BLUE} to quit.${NOCOLOUR}\n"
+printf "${LIGHT_BLUE}If you encounter a problem or want to stop the installation process, please press ${LIGHT_CYAN}Ctrl-C${LIGHT_BLUE} to quit.${NOCOLOUR}\n"
 printf "${LIGHT_BLUE}Use ${LIGHT_CYAN}Ctrl-Z${LIGHT_BLUE} in dire situations and reboot your system afterwards as it doesn't actually stop the script.${NOCOLOUR}\n"
 echo
 
@@ -904,8 +904,8 @@ declare iso_max=""
 
 while true; do
 
-    prompt_question "Please enter an ISO code to list the available layouts (ex: fr, de, au)"
-    prompt_question "(You can also type: 'd' - Use default [US] layout):"
+    prompt_question "Please enter an ISO code to list the available keyboard layouts (ex: fr, de, au)"
+    prompt_question "(You can also type 'd' to use the default [US] layout):"
     read -e -r -p " " iso
 
     while true; do
@@ -955,12 +955,14 @@ while true; do
         tmp_file="$(mktemp /tmp/Layout_test.XXXXXXXXXX)"
         
         {
+            echo ""
             echo "# This is a temporary file for testing your layout."
+            echo "# Some characters may not render, it is fine. Don't worry."
             echo "# Your layout is '$KEY_LAYOUT'"
             echo
             echo "# You can save with Ctrl-S,"
             echo "# quit with Ctrl-X,"
-            echo "# and open the manual with Ctrl-G."
+            echo "# and open help with Ctrl-G."
         } > "$tmp_file"
         
         nano "$tmp_file"
@@ -1740,9 +1742,10 @@ SELECTED_GREETER="$SELECTION"
 print_packages
 
 #Video driver selection
-#Get model
 prompt_different "Your graphics card model is:"
 lspci -v | grep -A1 -e VGA -e 3D
+echo
+printf "${YELLOW}You can look here for additional infromation: ${PURPLE}https://wiki.archlinux.org/title/xorg#Driver_installation${NOCOLOUR}"
 echo
 
 select_one "Available driver packages are:" "$VIDEO_DRIVER" "$VIDEO_DRIVER_AUR"
@@ -2065,8 +2068,8 @@ echo "$sudo_contents" > "$MOUNT_PATH/etc/sudoers"
 prompt_info "Arranging backgrounds..."
 if [ -d "assets" ]; then
 
-    cp Login_screen.png "$MOUNT_PATH/usr/share/backgrounds"
-    cp Background.png "$MOUNT_PATH/usr/share/backgrounds"
+    cp assets/Login_screen.png "$MOUNT_PATH/usr/share/backgrounds"
+    cp assets/Background.png "$MOUNT_PATH/usr/share/backgrounds"
 
     #XFCE
     if [ -d "$MOUNT_PATH/usr/share/backgrounds/xfce" ]; then
