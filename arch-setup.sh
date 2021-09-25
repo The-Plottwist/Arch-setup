@@ -2065,8 +2065,8 @@ echo "$sudo_contents" > "$MOUNT_PATH/etc/sudoers"
 prompt_info "Arranging backgrounds..."
 if [ -d "assets" ]; then
 
-    cp Login_screen.png "$MOUNT_PATH/usr/share/backgrounds"
-    cp Background.png "$MOUNT_PATH/usr/share/backgrounds"
+    cp assets/Login_screen.png "$MOUNT_PATH/usr/share/backgrounds"
+    cp assets/Background.png "$MOUNT_PATH/usr/share/backgrounds"
 
     #XFCE
     if [ -d "$MOUNT_PATH/usr/share/backgrounds/xfce" ]; then
