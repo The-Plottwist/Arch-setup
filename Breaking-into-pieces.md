@@ -2,7 +2,7 @@
 
 This file is only for demonstrative and understanding purposes and includes mediocre changes in the code. (Do not expect it to run)
 
-**Source code version:** v1.0.1
+**Source code version:** v1.3.3
 
 ## Table of contents
 
@@ -49,6 +49,7 @@ This file is only for demonstrative and understanding purposes and includes medi
   - [UEFI Check & Grub Arguments](#uefi-check--grub-arguments)
   - [Get Partition Table](#get-partition-table)
   - [Trimming](#trimming)
+  - [Calculating Swap](#calculating-swap)
   - [Partition Management](#partition-management)
     - [Automatic Partitioning](#automatic-partitioning)
     - [Manual Partition Selection](#manual-partition-selection)
@@ -97,7 +98,6 @@ declare GRUB_ARGS=""
 
 declare PARTITION_TABLE=""
 declare DISK=""
-declare DISK_SIZE_TIB=""
 declare DISK_SIZE_MIB=""
 declare IS_UEFI=""
 declare IS_ENCRYPT=""
@@ -442,7 +442,7 @@ function disk_check () {
             
             echo
             prompt_warning "The disk '$input' couldn't found."
-            printf "${LIGHT_RED}Please try again: ${NOCOLOUR}"
+            printf "${LIGHT_CYAN}Please give a ${LIGHT_RED}PATH${LIGHT_CYAN}: ${NOCOLOUR}"
             read -e -r -p " " input
         else
         
@@ -473,13 +473,13 @@ function partition_check () {
     fi
 
     #Use awk to remove unnecessary spaces
-    while ! output=$(lsblk -o type,path "$DISK" | awk '{print $1,$2}' | grep -v "disk" | grep -w "$input"); do
+    while ! output=$( { lsblk -o type,path "$DISK" | awk '{print $1,$2}' | grep -v "disk" | grep -w "$input"; } && [ -n "$input" ] ); do
     
         if [ "$is_argument" == "false" ]; then
         
             echo
             prompt_warning "Partition '$input' couldn't found."
-            printf "${LIGHT_RED}Please try again: ${NOCOLOUR}"
+            printf "${LIGHT_CYAN}Please give a ${LIGHT_RED}PATH${LIGHT_CYAN}: ${NOCOLOUR}"
             read -e -r -p " " input
         else
         
@@ -490,6 +490,7 @@ function partition_check () {
    PART_CHECK="$input"
 }
 ```
+
 #### Number_check
 
 ```bash
@@ -544,6 +545,8 @@ The purpose of the numbering is that after exiting from the list, the user is as
 #This is similar to "cat -n ... | less" command
 function list {
 
+    clear
+
     declare list=""
     declare message=""
     
@@ -554,7 +557,10 @@ function list {
         declare -i n=0
     
         printf "$message\n"
-        printf "${LIGHT_RED}(q: Quit from listing, /: search forward, ?: search backward, h: Help, Navigation: ↑↓, pg-up, pg-down)\n\n"
+        echo
+        prompt_different "PRESS (Q) TO QUIT LISTING!"
+        echo
+        printf "${LIGHT_RED}(/: search forward, ?: search backward, h: Help, Navigation: ↑↓, pg-up, pg-down)\n\n"
         
         for i in $list; do
     
@@ -562,6 +568,9 @@ function list {
             printf "${LIGHT_CYAN}%s ${NOCOLOUR}" "$n"
             printf "${PURPLE}%s${NOCOLOUR}\n" "$i"
         done
+        echo
+        prompt_different "PRESS (Q) TO QUIT LISTING!"
+        echo
     } | less --raw-control-chars
 }
 ```
@@ -1164,7 +1173,7 @@ done
 `VOLGROUP` and `MOUNT_PATH` are defined here too.
 
 ```bash
-prompt_question "Please enter a device name:"
+printf "${LIGHT_CYAN}Please give your device a ${LIGHT_RED}HOST${LIGHT_CYAN} name:${NOCOLOUR}"
 read -e -r -p " " DEVICE
 
 VOLGROUP="$DEVICE"VolGroup
@@ -1271,7 +1280,7 @@ TIMEZONE=$(echo "$l_timezones" | head -"$NUMBER_CHECK" | tail -1)
 echo
 printf "${LIGHT_GREEN}Your timezone is: ${LIGHT_CYAN}%s${NOCOLOUR}" "$TIMEZONE"
 
-sleep 3s
+sleep 2s
 ```
 
 ## Get Disk
@@ -1319,9 +1328,6 @@ PARTED_INFO="$(parted "$DISK" --script "u mib" \ "print")"
 #Get disk size in MiB and subtract the extension
 DISK_SIZE_MIB=$(echo "$PARTED_INFO" | grep "Disk $DISK:" | awk '{print $3}' | sed s/[A-Za-z]//g)
 
-#Convert it to TiB
-DISK_SIZE_TIB=$(( DISK_SIZE_MIB/(1024*1024) ))
-
 #Get Partition Table
 PARTITION_TABLE=$(echo "$PARTED_INFO" | grep "Partition Table:" | awk '{print $3}')
 
@@ -1354,6 +1360,25 @@ if echo "$PARTED_INFO" | head -1 | grep -w -q SSD; then
 fi
 ```
 
+## Calculating Swap
+
+```bash
+declare -i swap_size=0
+swap_size=$(free --giga | grep Mem: | awk '{print $2}')
+
+if (( swap_size <= 2 )); then
+
+    swap_size="$swap_size*3"
+elif (( swap_size <= 8 )); then
+
+    swap_size="$swap_size*2"
+elif (( swap_size > 8 )); then
+
+    swap_size=$((( swap_size/2+swap_size )))
+fi
+swap_size="$swap_size*1024" #Convert to MiB
+```
+
 ## Partition Management
 
 ### Automatic Partitioning
@@ -1370,8 +1395,8 @@ fi
 
 if output=$([ "$ENABLE_AUTO_PARTITIONING" == "true" ] && [ "$ANSWER" == "y" ] ); then
 
-    #GPT is required for disks that are bigger than 2TiB
-    if (( DISK_SIZE_TIB > 2 )); then
+    #GPT is required for disks that are larger than 2TB
+    if (( ! DISK_SIZE_MIB < 1907347 )); then
 
         PARTITION_TABLE="gpt"
     fi
@@ -1381,7 +1406,7 @@ if output=$([ "$ENABLE_AUTO_PARTITIONING" == "true" ] && [ "$ANSWER" == "y" ] );
     #BIOS Grub - 1mib
     #EFI System Partition [ESP] - 512mib                https://wiki.archlinux.org/title/EFI_system_partition#Create_the_partition
     #Boot - 500mib
-    #Swap - 8gib                                        https://wiki.archlinux.org/title/Dm-crypt/Encrypting_an_entire_system#LVM_on_LUKS
+    #Swap - differs                                     https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/6/html/installation_guide/s2-diskpartrecommend-x86
     #System - 32gib (If seperate)
     #Home - All of the available space
     
@@ -1396,7 +1421,7 @@ if output=$([ "$ENABLE_AUTO_PARTITIONING" == "true" ] && [ "$ANSWER" == "y" ] );
         NEEDED_SIZE+=512 #ESP
     fi
     NEEDED_SIZE+=500 #BOOT
-    NEEDED_SIZE+=8192 #SWAP
+    NEEDED_SIZE+=$swap_size #SWAP
     NEEDED_SIZE+=32768 #SYSTEM
 
     #If not enough space
@@ -1446,22 +1471,38 @@ if output=$([ "$ENABLE_AUTO_PARTITIONING" == "true" ] && [ "$ANSWER" == "y" ] );
     else
     
         IS_ENCRYPT="false"
+
+        prompt_question "Do you want seperate home and system partitions? (y/n):"
+        yes_no
+        if [ "$ANSWER" == "y" ]; then
+        
+            IS_SEPERATE="true"
+        else
+        
+            IS_SEPERATE="false"
+        fi
     fi
+
 
     # ---------------------------------------------------------------------------- #
     #                        Countdown before hard disk wipe                       #
     # ---------------------------------------------------------------------------- #
-
-    clear
     for i in {10..0}; do
 
-        printf "${LIGHT_RED}DANGER! Hard disk will be WIPED in: ${LIGHT_CYAN}%s${NOCOLOUR}\033[0K\r" "$i"
+        clear
+        printf "${LIGHT_RED}DANGER! your hard disk will be WIPED in: ${LIGHT_CYAN}%s${NOCOLOUR}" "$i"
         echo
-        printf "${LIGHT_RED}- You can quit with Ctrl-C -${NOCOLOUR}\033[0K\r" "$i"
+        echo
+        printf "${LIGHT_GREEN}- You can quit with Ctrl-C -${NOCOLOUR}"
         sleep 1s
     done
 
-
+    #Partition start, ends
+    declare -i swap_e=0
+    declare -i system_s=0
+    declare -i system_e=0
+    declare -i home_s=0
+    
     if [ "$IS_ENCRYPT" == "true" ]; then
     
         if [ "$IS_UEFI" == "true" ]; then #Encrypt true, UEFI=true
@@ -1510,27 +1551,21 @@ if output=$([ "$ENABLE_AUTO_PARTITIONING" == "true" ] && [ "$ANSWER" == "y" ] );
         fi
     else
     
-        prompt_question "Do you want seperate home and system partitions? (y/n):"
-        yes_no
-        if [ "$ANSWER" == "y" ]; then
-        
-            IS_SEPERATE="true"
-        else
-        
-            IS_SEPERATE="false"
-        fi
-        
-        
         if [ "$IS_UEFI" == "true" ]; then
         
             if [ "$IS_SEPERATE" == "true" ]; then #Encrypt false, UEFI=true, is seperate=true
                 
+                swap_e=$swap_size+1015
+                system_s=$swap_e+1
+                system_e=$system_s+32768
+                home_s=$system_e+1
+                
                 parted "$DISK" --script "mktable gpt" \
                                         "mkpart \"EFI System Partition\" 1mib 513mib" \
                                         "mkpart BOOT 514mib 1014mib" \
-                                        "mkpart SWAP 1015mib 9207mib" \
-                                        "mkpart SYSTEM 9208mib 41976mib" \
-                                        "mkpart HOME 41977mib -1"
+                                        "mkpart SWAP 1015mib \"$swap_e\"mib"
+                                        "mkpart SYSTEM \"$system_s\"mib \"$system_e\"mib" \
+                                        "mkpart HOME \"$home_s\"mib -1"
 
                 #ESP
                 parted "$DISK" --script "set 1 boot on" \
@@ -1545,11 +1580,14 @@ if output=$([ "$ENABLE_AUTO_PARTITIONING" == "true" ] && [ "$ANSWER" == "y" ] );
                 HOME_PARTITION="$DISK"5
             else #Encrypt false, UEFI=true, is seperate=false
             
+                swap_e=$swap_size+1015
+                system_s=$swap_e+1
+            
                 parted "$DISK" --script "mktable gpt" \
                                         "mkpart \"EFI System Partition\" 1mib 513mib" \
                                         "mkpart BOOT 514mib 1014mib" \
-                                        "mkpart SWAP 1015mib 9207mib" \
-                                        "mkpart SYSTEM 9208mib -1"
+                                        "mkpart SWAP 1015mib \"$swap_e\"mib" \
+                                        "mkpart SYSTEM \"$system_s\"mib -1"
 
                 #ESP
                 parted "$DISK" --script "set 1 boot on" \
@@ -1568,12 +1606,17 @@ if output=$([ "$ENABLE_AUTO_PARTITIONING" == "true" ] && [ "$ANSWER" == "y" ] );
                 
                 if [ "$PARTITION_TABLE" == "gpt" ]; then #Encrypt false, UEFI=false, is seperate=true, partition table=gpt
                 
+                    swap_e=$swap_size+504
+                    system_s=$swap_e+1
+                    system_e=$system_s+32768
+                    home_s=$system_e+1
+                
                     parted "$DISK" --script "mktable gpt" \
                                             "mkpart GRUB 1mib 2mib" \
                                             "mkpart BOOT 3mib 503mib" \
-                                            "mkpart SWAP 504mib 8696mib" \
-                                            "mkpart SYSTEM 8697mib 41465mib" \
-                                            "mkpart HOME 41466mib -1"
+                                            "mkpart SWAP 504mib \"$swap_e\"mib" \
+                                            "mkpart SYSTEM \"$system_s\"mib \"$system_e\"mib" \
+                                            "mkpart HOME \"$home_s\"mib -1"
                     
                     parted "$DISK" --script "set 1 bios_grub on"
                     
@@ -1583,12 +1626,17 @@ if output=$([ "$ENABLE_AUTO_PARTITIONING" == "true" ] && [ "$ANSWER" == "y" ] );
                     HOME_PARTITION="$DISK"5
                 else #Encrypt false, UEFI=false, is seperate=true, partition table=mbr
                 
+                    swap_e=$swap_size+503
+                    system_s=$swap_e+1
+                    system_e=$system_s+32768
+                    home_s=$system_e+1
+                
                     parted "$DISK" --script "mktable msdos" \
                                             "mkpart primary 1mib 501mib" \
                                             "mkpart extended 502mib -1" \
-                                            "mkpart logical 503mib 8695mib" \
-                                            "mkpart logical 8696mib 41464mib" \
-                                            "mkpart logical 41465mib -1"
+                                            "mkpart logical 503mib \"$swap_e\"mib" \
+                                            "mkpart logical \"$system_s\"mib \"$system_e\"mib" \
+                                            "mkpart logical \"$home_s\"mib -1"
                     
                     BOOT_PARTITION="$DISK"1
                     #Warning! Logical partitions start from 5.
@@ -1601,11 +1649,14 @@ if output=$([ "$ENABLE_AUTO_PARTITIONING" == "true" ] && [ "$ANSWER" == "y" ] );
             
                 if [ "$PARTITION_TABLE" == "gpt" ]; then #Encrypt false, UEFI=false, is seperate=false, partition table=gpt
                 
+                    swap_e=$swap_size+504
+                    system_s=$swap_e+1
+                
                     parted "$DISK" --script "mktable gpt" \
                                             "mkpart GRUB 1mib 2mib" \
                                             "mkpart BOOT 3mib 503mib" \
-                                            "mkpart SWAP 504mib 8696mib" \
-                                            "mkpart SYSTEM 8697mib -1"
+                                            "mkpart SWAP 504mib \"$swap_e\"mib" \
+                                            "mkpart SYSTEM \"$system_s\"mib -1"
                                         
                     parted "$DISK" --script "set 1 bios_grub on"
                     
@@ -1614,11 +1665,14 @@ if output=$([ "$ENABLE_AUTO_PARTITIONING" == "true" ] && [ "$ANSWER" == "y" ] );
                     SYSTEM_PARTITION="$DISK"4
                 else #Encrypt false, UEFI=false, is seperate=false, partition table=mbr
                 
+                    swap_e=$swap_size+503
+                    system_s=$swap_e+1
+                
                     parted "$DISK" --script "mktable msdos" \
                                             "mkpart primary 1mib 501mib" \
                                             "mkpart extended 502mib -1" \
-                                            "mkpart logical 503mib 8695mib" \
-                                            "mkpart logical 8696mib -1"
+                                            "mkpart logical 503mib \"$swap_e\"mib" \
+                                            "mkpart logical \"$system_s\"mib -1"
                     
                     BOOT_PARTITION="$DISK"1
                     #Warning! Logical partitions start from 5.
@@ -1634,18 +1688,19 @@ if output=$([ "$ENABLE_AUTO_PARTITIONING" == "true" ] && [ "$ANSWER" == "y" ] );
 ### Manual Partition Selection
 
 ```bash
-#Continuation of "if output=$([ "$ENABLE_AUTO_PARTITIONING" == "true" ] && [ "$ANSWER" == "y" ] ); then..."
 else
 
-    #Check if partition table is suitable
+    #Partition table is not suitable for linux
     if [ "$PARTITION_TABLE" == "other" ]; then
     
         prompt_warning "ERROR! Partition table not supported! "
+        printf "${YELLOW}For manual partitioning, see: ${PURPLE}https://github.com/The-Plottwist/Arch-setup/blob/main/Partitioning-manual.md${NOCOLOUR}\n\n"
         failure "Please use auto partitioning or format it with a correct table (MBR or GPT)."
     fi
     
     #Inform the user about needed partitions
     clear
+    printf "${YELLOW}For manual partitioning, see: ${PURPLE}https://github.com/The-Plottwist/Arch-setup/blob/main/Partitioning-manual.md${NOCOLOUR}\n\n"
     prompt_info "Needed partitions:"
     printf "\033[1A\033[2K\r" #Delete unnecessary carriage returns
     
@@ -1699,32 +1754,21 @@ else
         done
     fi
 
-
-    #BIOS GRUB partition
-    if output=$([ "$PARTITION_TABLE" == "gpt" ] && [ "$IS_UEFI" == "false" ]); then
-    
-        declare -i last_partition=0
-        declare print=""
-        
-        print=$(parted --script "$DISK" "print")
-        last_partition=$(echo "$print" | awk '{print $1}' | tail -1)
-        
-        echo
-        echo "$print"
-        
-        echo
-        printf "${LIGHT_CYAN}Please specify the number for the Grub parition ${LIGHT_RED}(1mib partition advised)${LIGHT_CYAN}: ${NOCOLOUR}"
-        number_check "$last_partition"
-        
-        parted "$DISK" --script "set $NUMBER_CHECK bios_grub on"
-        sleep 2s
-        clear
-    fi
-
-    
     #Print the disk
     echo
     lsblk "$DISK" -o +path,partlabel
+
+    #BIOS GRUB partition
+    if output=$([ "$PARTITION_TABLE" == "gpt" ] && [ "$IS_UEFI" == "false" ]); then
+        
+        declare p_bg=""
+
+        prompt_partition "BIOS Grub"
+        partition_check
+        p_bg=$(echo "$PART_CHECK" | sed "s/[A-Za-z]//g" | sed "s/\///g")
+
+        parted "$DISK" --script "set $p_bg bios_grub on"
+    fi
 
     #Get ESP
     if [ "$IS_UEFI" == "true" ]; then
@@ -1801,7 +1845,7 @@ fi
 
 ```bash
 #Wait before using parted again in case the disk is old
-sleep 5s
+sleep 3s
 
 #Print current configuration
 clear
@@ -1837,7 +1881,7 @@ if [ "$IS_ENCRYPT" == "true" ]; then
     prompt_info "Making logical volumes..."
     pvcreate /dev/mapper/cryptlvm
     vgcreate "$VOLGROUP" /dev/mapper/cryptlvm
-    lvcreate -L 8G "$VOLGROUP" -n swap
+    lvcreate -L "$swap_size" "$VOLGROUP" -n swap
     lvcreate -L 32G "$VOLGROUP" -n root
     lvcreate -l 100%FREE "$VOLGROUP" -n home
 
