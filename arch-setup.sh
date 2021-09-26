@@ -1503,10 +1503,11 @@ else #Manual partition selection
 
     #Look for LUKS partitions
     declare luks=""
-    luks=$(lsblk "$DISK" -o path,fstype | grep "crypto_LUKS" | awk '{print $1}')
+    luks=$(blkid | grep "$DISK" | grep "TYPE=\"crypto_LUKS\"" | awk '{print $1}' | sed "s/://g")
 
     if [ -n "$luks" ]; then
 
+        echo
         prompt_warning "In this option, encrypted partitions will not be handled automatically."
         printf "${YELLOW}You need to follow one of the guides in: ${PURPLE}https://wiki.archlinux.org/title/Dm-crypt/Encrypting_an_entire_system#Overview${NOCOLOUR}"
         echo
@@ -1529,9 +1530,9 @@ else #Manual partition selection
                 prompt_info "Opening $i..."
                 cryptsetup open "$i" LUKS$current_ || failure "Error! Cannot open $i, try rebooting."
             fi
-
-            sleep 1s
         done
+        
+        sleep 5s
     fi
 
     #Print the disk
