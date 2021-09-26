@@ -1572,12 +1572,17 @@ else #Manual partition selection
                 break
             else
             
-                umount /mnt/is_esp
+                prompt_warning "Couldn't found EFI directory. Are you sure this is the right partition? (y/n):"
+                yes_no
                 
-                prompt_warning "Not an EFI System partition!"
-                prompt_warning "Please re-enter!"
-                prompt_warning "You can quit with Ctrl-C or Ctrl-Z if needed."
-                sleep 2s
+                if [ "$ANSWER" == "y" ]; then
+                
+                    mkdir -p /mnt/is_esp/EFI
+                    umount /mnt/is_esp
+                    break
+                fi
+                
+                umount /mnt/is_esp
             fi
         done
     fi
