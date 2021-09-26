@@ -40,6 +40,8 @@ This is the default layout when archiso boots.
 
 ![alt text](assets/other/640px-KB_United_States-NoAltGr.svg.png)
 
+*Source: <https://commons.wikimedia.org/wiki/File:KB_United_States.svg>*
+
 ## Usage
 
 After [booting into the live environment](https://wiki.archlinux.org/title/Installation_guide#Boot_the_live_environment), do:
