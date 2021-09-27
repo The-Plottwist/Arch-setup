@@ -1503,7 +1503,7 @@ else #Manual partition selection
 
     #Look for LUKS partitions
     declare luks=""
-    luks=$(blkid | grep "$DISK" | grep "TYPE=\"crypto_LUKS\"" | awk '{print $1}' | sed "s/://g")
+    luks=$(lsblk "$DISK" -o path,fstype | grep "crypto_LUKS" | awk '{print $1}')
 
     if [ -n "$luks" ]; then
 
@@ -2080,7 +2080,7 @@ if [ -d "assets" ]; then
     #XFCE
     if [ -d "$MOUNT_PATH/usr/share/backgrounds/xfce" ]; then
     
-        cp Background.png "$MOUNT_PATH/usr/share/backgrounds/xfce/xfce-verticals.png"
+        cp assets/Background.png "$MOUNT_PATH/usr/share/backgrounds/xfce/xfce-verticals.png"
     fi
     
     #Login screen
