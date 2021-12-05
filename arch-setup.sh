@@ -710,17 +710,19 @@ function select_one () {
 }
 
 
+#Will be ran from arch-chroot with full sudo permissions
 function post-install () {
 
-    #Make a github directory and clone yay (will be called in user's terminal)
-    function clone_yay () {
+    #Install aur packages (will be called in user's terminal)
+    function aur_install () {
 
-        #Generating home directories
-        prompt_info "Generating $USER_NAME's home directories..."
+        #Generate home directories
+        prompt_info "Generating '$USER_NAME's home directories..."
         xdg-user-dirs-update
 
         check_connection
 
+        #Install yay (aur package manager)
         if ! [ -d "/home/$USER_NAME/Git-Hub/yay" ]; then
 
             prompt_info "Cloning yay..."
@@ -730,51 +732,44 @@ function post-install () {
             cd Git-Hub || failure "Cannot change directory to /home/$USER_NAME/Git-Hub"
             
             git clone https://aur.archlinux.org/yay.git || failure "Cannot clone yay."
+            
+            prompt_info "Installing yay..."
+            makepkg -si --noconfirm || failure "Error Cannot install yay!"
         fi
+
+        #Make the necessary directory
+        prompt_info "Downloading aur pkgbuilds..."
+        mkdir -p "/home/$USER_NAME/.cache/yay" || failure "Cannot make /home/$USER_NAME/.cache/yay directory!"
+        
+        #Change directory
+        cd "/home/$USER_NAME/.cache/yay" || failure "Cannot change directory to /home/$USER_NAME/.cache/yay"
+
+        #Download aur pkgbuilds
+        yay --getpkgbuild $AUR_PACKAGES || failure "Cannot download pkgbuilds!"
+
+        #Install aur packages
+        prompt_info "Installing aur packages..."
+        find . -type f -name "PKGBUILD" -execdir makepkg -si --noconfirm \;
     }
 
     #Generating home directories
     prompt_info "Generating 'root' home directories..."
     xdg-user-dirs-update
     
-    #Install go for yay
-    prompt_info "Installing go for aur helper..."
-    pacman -S --noconfirm go
+    #Install go for yay (Not necessary, makepkg will auto-install dependencies)
+    # prompt_info "Installing go for aur helper..."
+    # pacman -S --noconfirm go
     
     #Export variables to use it in the user's shell
     export USER_NAME="$USER_NAME"
     
     #Export functions to call it in the user's shell
-    export -f clone_yay
+    export -f aur_install
     export -f check_connection
 
-    #Clone yay
-    su "$USER_NAME" /bin/bash -c clone_yay || Exit_ $?
+    #Run aur_install in the user's shell
+    su "$USER_NAME" /bin/bash -c aur_install || Exit_ $?
 
-    #Install yay
-    prompt_info "Installing yay..."
-    cd "/home/$USER_NAME/Git-Hub/yay" || failure "Cannot change directory to /home/$USER_NAME/Git-Hub/yay"
-    sudo -u "$USER_NAME" makepkg -si --noconfirm || failure "Error Cannot install yay!"
-
-    #Download aur pkgbuilds
-    prompt_info "Downloading aur pkgbuilds..."
-    mkdir -p "/home/$USER_NAME/.cache/yay" || failure "Cannot make /home/$USER_NAME/.cache/yay directory!"
-    cd "/home/$USER_NAME/.cache/yay" || failure "Cannot change directory to /home/$USER_NAME/.cache/yay"
-    yay --getpkgbuild $AUR_PACKAGES || failure "Cannot download pkgbuilds!"
-
-    #Arrange permissions
-    chown -R "$USER_NAME:$USER_NAME" "/home/$USER_NAME/.cache/"
-
-    #Install aur packages
-    prompt_info "Installing aur packages..."
-    cd "/home/$USER_NAME/.cache/yay" || failure "Cannot change directory to /home/$USER_NAME/.cache/yay"
-    for i in *; do
-
-        cd "$i"
-        sudo -u "$USER_NAME" makepkg -si --noconfirm
-        cd ..
-    done
-    
     # ------------------------------- Login Manager ------------------------------ #
     #Check if /etc/lightdm.conf exists
     if [ -f "/etc/lightdm/lightdm.conf" ]; then
@@ -2059,16 +2054,15 @@ export -f Exit_
 
 export -f post-install
 
-#Arrange sudo for post-install
-declare sudo_contents=""
-sudo_contents="$(cat $MOUNT_PATH/etc/sudoers)"
-printf "\n\n%s ALL=(ALL) NOPASSWD: ALL\n" "$USER_NAME" >> "$MOUNT_PATH/etc/sudoers"
+#Arrange temporary permissions
+mkdir -p "$MOUNT_PATH/etc/sudoers.d/"
+printf "%s ALL=(ALL) NOPASSWD: ALL\n" "$USER_NAME" > "$MOUNT_PATH/etc/sudoers.d/temp_permissions"
 
 #Post install
 arch-chroot "$MOUNT_PATH" /bin/bash -c "post-install" || Exit_ $?
 
-#Restore sudo
-echo "$sudo_contents" > "$MOUNT_PATH/etc/sudoers"
+#Restore temporary permissions
+rm "$MOUNT_PATH/etc/sudoers.d/temp_permissions"
 
 #Backgrounds
 prompt_info "Arranging backgrounds..."
