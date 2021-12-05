@@ -732,7 +732,8 @@ function post-install () {
             cd Git-Hub || failure "Cannot change directory to /home/$USER_NAME/Git-Hub"
             
             git clone https://aur.archlinux.org/yay.git || failure "Cannot clone yay."
-            
+            cd yay || failure "Cannot change directory to /home/$USER_NAME/Git-Hub/yay"
+
             prompt_info "Installing yay..."
             makepkg -si --noconfirm || failure "Error Cannot install yay!"
         fi
@@ -749,7 +750,12 @@ function post-install () {
 
         #Install aur packages
         prompt_info "Installing aur packages..."
-        find . -type f -name "PKGBUILD" -execdir makepkg -si --noconfirm \;
+        find . -type f -name "PKGBUILD" -execdir /bin/bash -c "makepkg -si --noconfirm || pwd >> /home/$USER_NAME/failed_aur_packages.txt" \;
+        if [ -f "/home/$USER_NAME/failed_aur_packages.txt" ]; then
+
+            echo "Some aur packages couldn't been installed."
+            failure "You can find failed packages in '$MOUNT_PATH/home/$USER_NAME/failed_aur_packages.txt'"
+        fi
     }
 
     #Generating home directories
@@ -762,6 +768,7 @@ function post-install () {
     
     #Export variables to use it in the user's shell
     export USER_NAME="$USER_NAME"
+    export MOUNT_PATH="$MOUNT_PATH"
     
     #Export functions to call it in the user's shell
     export -f aur_install
@@ -2046,6 +2053,7 @@ arch-chroot "$MOUNT_PATH" /bin/bash -c "setup"
 export AUR_PACKAGES="$AUR_PACKAGES"
 export SELECTED_GREETER="$SELECTED_GREETER"
 export SERVICES="$SERVICES"
+export MOUNT_PATH="$MOUNT_PATH"
 
 #Export additional functions
 export -f check_connection
