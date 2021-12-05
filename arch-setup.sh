@@ -751,11 +751,6 @@ function post-install () {
         #Install aur packages
         prompt_info "Installing aur packages..."
         find . -type f -name "PKGBUILD" -execdir /bin/bash -c "makepkg -si --noconfirm || pwd >> /home/$USER_NAME/failed_aur_packages.txt" \;
-        if [ -f "/home/$USER_NAME/failed_aur_packages.txt" ]; then
-
-            echo "Some aur packages couldn't been installed."
-            failure "You can find failed packages in '$MOUNT_PATH/home/$USER_NAME/failed_aur_packages.txt'"
-        fi
     }
 
     #Generating home directories
@@ -776,6 +771,21 @@ function post-install () {
 
     #Run aur_install in the user's shell
     su "$USER_NAME" /bin/bash -c aur_install || Exit_ $?
+
+    #Check failed builds
+    if [ -f "/home/$USER_NAME/failed_aur_packages.txt" ]; then
+
+        prompt_warning "These packages couldn't been installed:"
+        cat "/home/$USER_NAME/failed_aur_packages.txt"
+        
+        prompt_question "Do you want to continue (y/n): "
+        yes_no
+
+        if [[ "$ANSWER" == "n" ]]; then
+        
+            failure "You can find the failed packages in '$MOUNT_PATH/home/$USER_NAME/failed_aur_packages.txt'"
+        fi
+    fi
 
     # ------------------------------- Login Manager ------------------------------ #
     #Check if /etc/lightdm.conf exists
