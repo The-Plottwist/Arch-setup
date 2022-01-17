@@ -1541,10 +1541,13 @@ else #Manual partition selection
     
                 prompt_info "Opening $i..."
                 cryptsetup open "$i" LUKS$current_ || failure "Error! Cannot open $i, try rebooting."
+
+                prompt_info "Activating logical volumes..."
+                vgchange -a y "$(pvs /dev/mapper/LUKS$current_ | awk '{print $2}' | tail -1)" || failure "Error! Cannot activate logical volumes, try rebooting."
             fi
         done
-        
-        sleep 5s
+
+        sleep 1s
     fi
 
     #Print the disk
