@@ -103,7 +103,7 @@ declare SELECTED_VIDEO_DRIVER=""
 
 #Warning: This variable is also modified from the pkg_specific_operations function!
 #Services to enable
-declare SERVICES="dhcpcd NetworkManager thermald cpupower lightdm"
+declare SERVICES="dhcpcd NetworkManager thermald paccache.timer cpupower lightdm"
 
 
 # ---------------------------------------------------------------------------- #
