@@ -33,8 +33,7 @@
 
 # ---------------------------------- Globals --------------------------------- #
 
-declare PROGRAM_NAME=""
-PROGRAM_NAME="arch-setup.sh"
+readonly PROGRAM_NAME="arch-setup.sh"
 
 declare DISK_CHECK=""
 declare PART_CHECK=""
@@ -69,36 +68,34 @@ declare USER_NAME=""
 declare USER_PASS=""
 declare ROOT_PASS=""
 
-#It has a function with the same name
-declare PKG_SPECIFIC_OPERATIONS="virtualbox clamav lightdm-slick-greeter lightdm-gtk-greeter"
+readonly PKG_SPECIFIC_OPERATIONS="virtualbox clamav lightdm-slick-greeter lightdm-gtk-greeter" #It has a function with the same name
 
 # ---------------------------- Packages To Install --------------------------- #
-
-declare CORE_PACKAGES="base linux linux-firmware"
-
-#Warning: This variable is also modified from the pkg_specific_operations function!
-declare PACKAGES="os-prober lvm2 sudo base-devel screen git python python-pip cpupower thermald dhcpcd dhclient flatpak parted htop lshw man-db man-pages texinfo mc net-tools network-manager-applet networkmanager nm-connection-editor ntfs-3g pacman-contrib unrar unzip p7zip usbutils wget xdg-user-dirs firefox deluge gimp inkscape keepassxc libreoffice-fresh vlc cups"
-
 #All additional packages will be asked to user.
 #They will be added to the original set if accepted.
-declare ADDITIONAL_PACKAGES="virtualbox clamav"
+#Note: Mixed use of readonly and normal variables!
 
-declare BOOTLOADER_PACKAGES="grub intel-ucode amd-ucode"
+readonly CORE_PACKAGES="base linux linux-firmware"
+readonly BOOTLOADER_PACKAGES="grub intel-ucode amd-ucode"
 
-declare DE_PACKAGES="xorg xorg-server xfce4 xfce4-goodies"
-declare DE_DEPENDENT_PACKAGES="xsane system-config-printer gparted deluge-gtk foliate eom evolution evolution-on file-roller atril gvfs gvfs-mtp gufw pavucontrol pulseaudio seahorse"
+#Warning: Also modified from pkg_specific_operations().
+declare PACKAGES="os-prober lvm2 sudo base-devel screen git python python-pip cpupower thermald dhcpcd dhclient flatpak parted htop lshw man-db man-pages texinfo mc net-tools network-manager-applet networkmanager nm-connection-editor ntfs-3g pacman-contrib unrar unzip p7zip usbutils wget xdg-user-dirs firefox deluge gimp inkscape keepassxc libreoffice-fresh vlc cups"
+readonly ADDITIONAL_PACKAGES="virtualbox clamav"
 
+readonly DE_PACKAGES="xorg xorg-server xfce4 xfce4-goodies"
+readonly DE_DEPENDENT_PACKAGES="xsane system-config-printer gparted deluge-gtk foliate eom evolution evolution-on file-roller atril gvfs gvfs-mtp gufw pavucontrol pulseaudio seahorse"
+
+#Warning: Also modified from pkg_specific_operations().
 declare AUR_PACKAGES="cpupower-gui-git nano-syntax-highlighting"
-declare ADDITIONAL_AUR_PACKAGES="ttf-ms-fonts"
+readonly ADDITIONAL_AUR_PACKAGES="ttf-ms-fonts"
 
-declare DISPLAY_MANAGER="lightdm"
-
-declare GREETER="lightdm-gtk-greeter"
-declare GREETER_AUR="lightdm-slick-greeter"
+readonly DISPLAY_MANAGER="lightdm"
+readonly GREETER="lightdm-gtk-greeter"
+readonly GREETER_AUR="lightdm-slick-greeter"
 declare SELECTED_GREETER=""
 
-declare VIDEO_DRIVER="xf86-video-intel xf86-video-nouveau xf86-video-ati xf86-video-amdgpu nvidia"
-declare VIDEO_DRIVER_AUR="nvidia-390xx"
+readonly VIDEO_DRIVER="xf86-video-intel xf86-video-nouveau xf86-video-ati xf86-video-amdgpu nvidia"
+readonly VIDEO_DRIVER_AUR="nvidia-390xx"
 declare SELECTED_VIDEO_DRIVER=""
 
 #Warning: This variable is also modified from the pkg_specific_operations function!
@@ -110,23 +107,23 @@ declare SERVICES="dhcpcd NetworkManager thermald paccache.timer cpupower lightdm
 #                        Colours for colourful prompting                       #
 # ---------------------------------------------------------------------------- #
 
-#declare BLACK='\033[0;30m'
-#declare DARK_GRAY='\033[1;30m'
-#declare RED='\033[0;31m'
-declare LIGHT_RED='\033[1;31m'
-#declare GREEN='\033[0;32m'
-declare LIGHT_GREEN='\033[1;32m'
-#declare ORANGE='\033[0;33m'
-declare YELLOW='\033[1;33m'
-#declare BLUE='\033[0;34m'
-declare LIGHT_BLUE='\033[1;34m'
-declare PURPLE='\033[0;35m'
-#declare LIGHT_PURPLE='\033[1;35m'
-#declare CYAN='\033[0;36m'
-declare LIGHT_CYAN='\033[1;36m'
-#declare LIGHT_GRAY='\033[0;37m'
-#declare WHITE='\033[1;37m'
-declare NOCOLOUR='\033[0m'
+#readonly BLACK='\033[0;30m'
+#readonly DARK_GRAY='\033[1;30m'
+#readonly RED='\033[0;31m'
+readonly LIGHT_RED='\033[1;31m'
+#readonly GREEN='\033[0;32m'
+readonly LIGHT_GREEN='\033[1;32m'
+#readonly ORANGE='\033[0;33m'
+readonly YELLOW='\033[1;33m'
+#readonly BLUE='\033[0;34m'
+readonly LIGHT_BLUE='\033[1;34m'
+readonly PURPLE='\033[0;35m'
+#readonly LIGHT_PURPLE='\033[1;35m'
+#readonly CYAN='\033[0;36m'
+readonly LIGHT_CYAN='\033[1;36m'
+#readonly LIGHT_GRAY='\033[0;37m'
+#readonly WHITE='\033[1;37m'
+readonly NOCOLOUR='\033[0m'
 
 
 # --------------------------------- Functions -------------------------------- #
