@@ -98,8 +98,7 @@ readonly VIDEO_DRIVER="xf86-video-intel xf86-video-nouveau xf86-video-ati xf86-v
 readonly VIDEO_DRIVER_AUR="nvidia-390xx"
 declare SELECTED_VIDEO_DRIVER=""
 
-#Warning: This variable is also modified from the pkg_specific_operations function!
-#Services to enable
+#Warning: Also modified from pkg_specific_operations().
 declare SERVICES="dhcpcd NetworkManager thermald paccache.timer cpupower lightdm"
 
 
