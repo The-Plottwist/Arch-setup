@@ -504,14 +504,19 @@ function pkg_select () {
 }
 
 
-#Search for a package and add it to the PKG_FIND if exist
+#Search exactly for a package and add it to the PKG_FIND if found
 #--quiet: Check only one package and return accordingly
 function pkg_find () {
 
-    declare is_quiet=""
-    declare search=("")
+    local is_quiet=""
+    local search=("")
 
     if [ "$1" == "--quiet" ]; then
+
+        if [ -n "$3" ]; then
+        
+            failure "Error (pkg_find --quiet): Expected only 2 arguments, received 3 or more."
+        fi
 
         is_quiet="true"
         search=("$2")
@@ -519,41 +524,43 @@ function pkg_find () {
 
         is_quiet="false"
         search=("$@")
+
+        #Make them unique
+        #https://stackoverflow.com/questions/13648410/how-can-i-get-unique-values-from-an-array-in-bash
+        #https://github.com/koalaman/shellcheck/wiki/SC2207
+        IFS=" " read -r -a search <<< $(echo "${search[@]}" | tr ' ' '\n' | sort -u | tr '\n' ' ')
     fi
 
     #Check if the given package is alredy found
-    for i in $PKG_FIND; do
+    local tmp=""
+    tmp=$(echo "$PKG_FIND" | tr ' ' '\n')
+    for i in "${search[@]}"; do
     
-        for j in "${search[@]}"; do
-        
-            if [ "$j" == "$i" ]; then
+        if echo "$tmp" | grep -q -x "$i"; then
 
-                if [ "$is_quiet" == "false" ]; then
+            if [ "$is_quiet" == "false" ]; then
 
-                    search=( "${search[@]/$i}" ) #Omit the founded package
-                else
+                search=( "${search[@]/$i}" ) #Omit the founded package from search
+            else
 
-                    return 0
-                fi
+                return 0
             fi
-        done
+        fi
     done
     
-    #Make values unique
-    #https://stackoverflow.com/questions/13648410/how-can-i-get-unique-values-from-an-array-in-bash
-    #https://github.com/koalaman/shellcheck/wiki/SC2207
-    IFS=" " read -r -a search <<< "$(tr ' ' '\n' <<< "${search[@]}" | sort -u | tr '\n' ' ')"
+    #Else search for the given package
+    local -i l="${#search[@]}"
+    if (( l > 0 )); then
     
-    #Search for the given package
-    if [ "${#search[@]}" != "0" ]; then
-    
-        for i in $CORE_PACKAGES $PACKAGES $BOOTLOADER_PACKAGES $DISPLAY_MANAGER $DE_PACKAGES $DE_DEPENDENT_PACKAGES $AUR_PACKAGES $SELECTED_GREETER $SELECTED_VIDEO_DRIVER; do
+        l="$((l-1))"
+        if [ "${search[$l]}" != "" ]; then
         
-            for j in "${search[@]}"; do
+            tmp=$(echo "$CORE_PACKAGES $PACKAGES $BOOTLOADER_PACKAGES $DISPLAY_MANAGER $DE_PACKAGES $DE_DEPENDENT_PACKAGES $AUR_PACKAGES $SELECTED_GREETER $SELECTED_VIDEO_DRIVER" | tr ' ' '\n')
+            for i in "${search[@]}"; do
             
-                if [ "$i" == "$j" ]; then
+                if echo "$tmp" | grep -q -x "$i"; then
                 
-                    PKG_FIND+=" $j" #Add to the PKG_FIND
+                    PKG_FIND+="$i " #Add to the PKG_FIND
                     
                     if [ "$is_quiet" == "false" ]; then
 
@@ -564,12 +571,12 @@ function pkg_find () {
                     fi
                 fi
             done
-        done
+        fi
     fi
 
     if [ "$is_quiet" == "true" ]; then
 
-        return 17
+        return 17 #Return error if nothing found
     fi
 }
 
