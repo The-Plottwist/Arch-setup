@@ -620,10 +620,10 @@ function pkg_specific_operations () {
                         #You can also visit: https://wiki.archlinux.org/title/VirtualBox#Installation_steps_for_Arch_Linux_hosts
                     ;;
                     
-                    "clamav")
+                    if pkg_find --quiet "linux-lts"; then #Lts Kernel
                     
-                        SERVICES+=" clamav-freshclam"
-                    ;;
+                        PACKAGES+=" linux-lts-headers"
+                    fi
                     
                     "lightdm-slick-greeter")
                     
