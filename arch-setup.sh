@@ -584,74 +584,54 @@ function pkg_find () {
 #i.e. syntax should be: foo+=" bar"
 function pkg_specific_operations () {
 
-    pkg_find "$@"
+    pkg_find $PKG_SPECIFIC_OPERATIONS
     
-    for i in $PKG_FIND; do
+    local tmp=""
+    tmp=$(echo "$PKG_FIND" | tr ' ' '\n')
+
+    for i in $PKG_SPECIFIC_OPERATIONS; do
     
-        for j in "$@"; do
+        if echo "$tmp" | grep -q -x "$i"; then
         
-            if [ "$j" == "$i" ]; then
+            case "$i" in
             
-                case $j in
+                "virtualbox")
                 
-                    #https://wiki.archlinux.org/title/VirtualBox#Installation_steps_for_Arch_Linux_hosts
-                    "virtualbox")
+                    #Find which kernel is in use
+                    if pkg_find --quiet "linux"; then #Default Kernel
                     
-                        declare is_default_kernel=""
-                        declare is_lts=""
-                        
-                        #Find which kernel is in use
-                        pkg_find "linux" "linux-lts"
-                        for it in $PKG_FIND; do
-                        
-                            if [ "$it" == "linux" ]; then
-                            
-                                is_default_kernel="true"
-                                break
-                            elif [ "$it" == "linux-lts" ]; then
-                            
-                                is_lts="true"
-                                break
-                            fi
-                        done
-                        
-                        
-                        #Add the needed packages to queue
-                        if [ "$is_default_kernel" == "true" ]; then
-                        
-                            PACKAGES+=" virtualbox-host-modules-arch"
-                        else
-                        
-                            PACKAGES+=" virtualbox-host-dkms"
-                        fi
-                        
-                        
-                        if [ "$is_lts" == "true" ]; then
-                        
-                            PACKAGES+=" linux-lts-headers"
-                        fi
-                        
-                        #Warning! If you are using a custom kernel, find & install appropriate headers.
-                        #They are not installed by default.
-                    ;;
+                        PACKAGES+=" virtualbox-host-modules-arch"
+                    else
+
+                        PACKAGES+=" virtualbox-host-dkms"
+                    fi
                     
-                    "clamav")
+                    if pkg_find --quiet "linux-lts"; then #Lts Kernel
                     
-                        SERVICES+=" clamav-freshclam"
-                    ;;
+                        PACKAGES+=" linux-lts-headers"
+                    fi
                     
-                    "lightdm-slick-greeter")
-                    
-                        AUR_PACKAGES+=" lightdm-settings"
-                    ;;
-                    
-                    "lightdm-gtk-greeter")
-                    
-                        PACKAGES+=" lightdm-gtk-greeter-settings"
-                    ;;
-                esac
-            fi
-        done
+                    #Warning! If you are using a custom kernel, find & install appropriate virtualbox headers.
+                    #They are not installed by default.
+                    #You can also visit: https://wiki.archlinux.org/title/VirtualBox#Installation_steps_for_Arch_Linux_hosts
+                ;;
+                
+                "clamav")
+                
+                    SERVICES+=" clamav-freshclam"
+                ;;
+                
+                "lightdm-slick-greeter")
+                
+                    AUR_PACKAGES+=" lightdm-settings"
+                ;;
+                
+                "lightdm-gtk-greeter")
+                
+                    PACKAGES+=" lightdm-gtk-greeter-settings"
+                ;;
+            esac
+        fi
     done
 }
 
@@ -1775,7 +1755,8 @@ echo
 select_one "Available driver packages are:" "$VIDEO_DRIVER" "$VIDEO_DRIVER_AUR"
 SELECTED_VIDEO_DRIVER="$SELECTION"
 
-pkg_specific_operations $PKG_SPECIFIC_OPERATIONS
+#Do package specific stuff
+pkg_specific_operations
 
 print_packages
 
