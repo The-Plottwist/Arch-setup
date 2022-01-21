@@ -186,20 +186,20 @@ function Umount_ () {
 
     if [ -z "$DISK" ]; then return; fi
     
-    declare MOUNTPOINTS_U=""
-    declare SWAPS_U=""
-    declare CRYPT_U=""
-    declare LVM_U=""
-    declare LUKS_U=""
+    local mountpoints_u=""
+    local swaps_u=""
+    local crypt_u=""
+    local lvm_u=""
+    local luks_u=""
     
     
     prompt_info "Unmounting please wait..."
     
     #Umount
-    MOUNTPOINTS_U=$(lsblk -o mountpoints "$DISK" | grep "/" | sort --reverse)
-    if [ -n "$MOUNTPOINTS_U" ]; then
+    mountpoints_u=$(lsblk -o mountpoints "$DISK" | grep "/" | sort --reverse)
+    if [ -n "$mountpoints_u" ]; then
     
-        for i in $MOUNTPOINTS_U; do
+        for i in $mountpoints_u; do
     
                umount "$i"
         done
@@ -208,10 +208,10 @@ function Umount_ () {
     fi
     
     #Swapoff
-    SWAPS_U=$(lsblk -o mountpoints,path "$DISK" | grep "\[SWAP\]" | awk '{print $2}')
-    if [ -n "$SWAPS_U" ]; then
+    swaps_u=$(lsblk -o mountpoints,path "$DISK" | grep "\[SWAP\]" | awk '{print $2}')
+    if [ -n "$swaps_u" ]; then
     
-        for i in $SWAPS_U; do
+        for i in $swaps_u; do
                     
             swapoff "$i"
         done
@@ -220,13 +220,13 @@ function Umount_ () {
     fi
     
     
-    CRYPT_U=$(lsblk -o type,path "$DISK")
+    crypt_u=$(lsblk -o type,path "$DISK")
     
     #Logical volumes
-    LVM_U=$(echo "$CRYPT_U" | grep -w "lvm" | awk '{print $2}')
-    if [ -n "$LVM_U" ]; then
+    lvm_u=$(echo "$crypt_u" | grep -w "lvm" | awk '{print $2}')
+    if [ -n "$lvm_u" ]; then
         
-        for i in $LVM_U; do
+        for i in $lvm_u; do
             
             cryptsetup close "$i"
         done
@@ -235,10 +235,10 @@ function Umount_ () {
     fi
     
     #LUKS partitions
-    LUKS_U=$(echo "$CRYPT_U" | grep -w "crypt" | awk '{print $2}')
-    if [ -n "$LUKS_U" ]; then
+    luks_u=$(echo "$crypt_u" | grep -w "crypt" | awk '{print $2}')
+    if [ -n "$luks_u" ]; then
         
-        for i in $LUKS_U; do
+        for i in $luks_u; do
             
             cryptsetup close "$i"
         done
@@ -294,8 +294,8 @@ function yes_no () {
 
 function disk_check () {
 
-    declare input=""
-    declare is_argument=""
+    local input=""
+    local is_argument=""
     
     if [ -n "$1" ]; then
     
@@ -329,8 +329,8 @@ function disk_check () {
 
 function partition_check () {
 
-    declare input=""
-    declare is_argument=""
+    local input=""
+    local is_argument=""
     
     if [ -n "$1" ]; then
     
@@ -363,7 +363,7 @@ function partition_check () {
 
 function number_check () {
 
-    declare max_=0
+    local max_=0
     
     #max_ cannot be zero nor char
     if output=$([[ ! $1 =~ ^[0-9]+$ ]] || (( $1 == 0 )) ); then
@@ -375,7 +375,7 @@ function number_check () {
     fi
     
     
-    declare is_argument=""
+    local is_argument=""
     if [ -n "$2" ]; then
     
         is_argument="true"
@@ -406,14 +406,14 @@ function list {
 
     clear
 
-    declare list=""
-    declare message=""
+    local list_=""
+    local message=""
     
-    list="$1"
+    list_="$1"
     message="$2"
     
     {
-        declare -i n=0
+        local -i n=0
     
         printf "$message\n"
         echo
@@ -421,7 +421,7 @@ function list {
         echo
         printf "${LIGHT_RED}(/: search forward, ?: search backward, h: Help, Navigation: ↑↓, pg-up, pg-down)\n\n"
         
-        for i in $list; do
+        for i in $list_; do
     
             n+=1
             printf "${LIGHT_CYAN}%s ${NOCOLOUR}" "$n"
@@ -485,7 +485,7 @@ function print_packages () {
 #and asks each of them to include it in the original set or not
 function pkg_select () {
 
-    declare selection_=""
+    local selection_=""
     print_packages
 
     for i in $1; do
@@ -660,9 +660,9 @@ function pkg_specific_operations () {
 
 function select_one () {
 
-    declare message=""
-    declare official_pkgs=""
-    declare aur_pkgs=""
+    local message=""
+    local official_pkgs=""
+    local aur_pkgs=""
     
     message="$1"
     official_pkgs="$2"
@@ -672,14 +672,14 @@ function select_one () {
     echo
     echo
     
-    declare -i max=0
+    local -i max=0
     for i in $official_pkgs; do
     
         max+=1
         printf "${PURPLE}%s (${LIGHT_CYAN}%s${PURPLE}) ${NOCOLOUR}" "$i" "$max"
     done
     
-    declare -i aur_part=0
+    local -i aur_part=0
     aur_part+=$max+1
     for i in $aur_pkgs; do
     
@@ -694,7 +694,7 @@ function select_one () {
     number_check "$max"
     
     #Include it in the installation
-    declare -i current=0
+    local -i current=0
     for i in $official_pkgs $aur_pkgs; do
     
         current+=1
@@ -800,7 +800,7 @@ function post-install () {
     
         if pacman -Q "$SELECTED_GREETER"; then
         
-            declare lightdm_conf=""
+            local lightdm_conf=""
             lightdm_conf=$(sed "s/#greeter-session=example-gtk-gnome/greeter-session=$SELECTED_GREETER/g" /etc/lightdm/lightdm.conf)
             
             sleep 1s
@@ -1827,7 +1827,7 @@ function setup () {
     ln -sf /usr/share/zoneinfo/"$TIMEZONE" /etc/localtime
     
     #Locales
-    declare locale=""
+    local locale=""
     locale=$(sed "s/#en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/g" /etc/locale.gen)
     
     if [ -n "$locale" ]; then
@@ -1879,7 +1879,7 @@ function setup () {
     
     # --------------------------------- Initramfs -------------------------------- #
     
-    declare mkinitcpio=""
+    local mkinitcpio=""
     
     if [ "$IS_ENCRYPT" == "true" ]; then
     
@@ -1930,18 +1930,18 @@ function setup () {
     grub-install $GRUB_ARGS
     
     #Configure grub
-    declare cmdline=""
+    local cmdline=""
     
     if [ "$IS_ENCRYPT" == "true" ]; then
     
-        declare encrypt_uuid=""
+        local encrypt_uuid=""
         encrypt_uuid=$(blkid "$ENCRYPT_PARTITION" | awk '{print $2}' | sed s/\"//g)
         
         cmdline=$(sed "s|GRUB_CMDLINE_LINUX=\"\"|GRUB_CMDLINE_LINUX=\"cryptdevice=$encrypt_uuid:cryptlvm root=/dev/$VOLGROUP/root resume=/dev/$VOLGROUP/swap\"|g" /etc/default/grub)
     else
         
         #For hibernation
-        declare swap_uuid=""
+        local swap_uuid=""
         swap_uuid=$(blkid "$SWAP_PARTITION" | awk '{print $2}' | sed s/\"//g)
         
         cmdline=$(sed "s|GRUB_CMDLINE_LINUX=\"\"|GRUB_CMDLINE_LINUX=\"resume=$swap_uuid\"|g" /etc/default/grub)
@@ -1993,7 +1993,7 @@ function setup () {
     
     #Enable sudo
     prompt_info "Enabling sudo..."
-    declare sudoers=""
+    local sudoers=""
     sudoers=$(sed "s/# %sudo/%sudo/g" /etc/sudoers)
     
     sleep 1s
