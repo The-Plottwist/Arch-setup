@@ -4,6 +4,8 @@ A single and fully customizable installer script for archlinux.
 
 Archlinux is a distro that it gives full control to anyone who wants to install this distro. With their comprehensive [wiki page](https://wiki.archlinux.org/), one can find satisfying answers to his/her questions and can follow various guides to achieve his/her customized installation. By writing this script, I wanted to retain this customizability while on the other hand automating my installation process.
 
+And you can do so too. It is a single bash script after all. Just follow [how to modify the code](#how-to-modify-the-code) section.
+
 ## Features
 
 *`arch-setup.sh` provides a complete system installation which can be boiled down to:*
@@ -87,6 +89,8 @@ to this:
 You can read: [Breaking-into-pieces.md](https://github.com/The-Plottwist/Arch-setup/blob/main/Breaking-into-pieces.md) and [Before-altering.md](https://github.com/The-Plottwist/Arch-setup/blob/main/Before-altering.md)
 
 Rest is up to you.
+
+***Sidenote: The source code version used in the [Breaking-into-pieces.md](https://github.com/The-Plottwist/Arch-setup/blob/main/Breaking-into-pieces.md) is different form the development branch. It is only there for learning purposes and will not run due to alterations made to make it look pretty.***
 
 ## Image Credentials
 

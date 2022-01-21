@@ -26,4 +26,4 @@ See:
 
 - Configure your `GRUB` accordingly (see: [Login manager](https://github.com/The-Plottwist/Arch-setup/blob/main/Breaking-into-pieces.md#login-manager) and [Uefi check & Grub-arguments](https://github.com/The-Plottwist/Arch-setup/blob/main/Breaking-into-pieces.md#uefi-check--grub-arguments))
 
-- Check `pkg_specific_operations` [function](https://github.com/The-Plottwist/Arch-setup/blob/main/Breaking-into-pieces.md#pkg_specific_operations) and add your package dependent changes here.
+- Check [```pkg_specific_operations()```](https://github.com/The-Plottwist/Arch-setup/blob/main/Breaking-into-pieces.md#pkg_specific_operations) and add your package dependent changes here.
