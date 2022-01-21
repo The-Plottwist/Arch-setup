@@ -68,7 +68,9 @@ declare USER_NAME=""
 declare USER_PASS=""
 declare ROOT_PASS=""
 
-readonly PKG_SPECIFIC_OPERATIONS="virtualbox clamav lightdm-slick-greeter lightdm-gtk-greeter" #It has a function with the same name
+#Packages that aren't stated in this set will be ignored!
+#It has a function with the same name
+readonly PKG_SPECIFIC_OPERATIONS="virtualbox clamav lightdm-slick-greeter lightdm-gtk-greeter nano-syntax-highlighting"
 
 # ---------------------------- Packages To Install --------------------------- #
 #All additional packages will be asked to user.
@@ -580,8 +582,8 @@ function pkg_find () {
     fi
 }
 
-#A space must be put before adding it to the package set
-#i.e. syntax should be: foo+=" bar"
+#Accepts two arguments "--pre-install" & "--post-install"
+#A space must be put before modifying a set (i.e. package adding syntax should be: PACKAGE+=" bar")
 function pkg_specific_operations () {
 
     pkg_find $PKG_SPECIFIC_OPERATIONS
@@ -589,50 +591,71 @@ function pkg_specific_operations () {
     local tmp=""
     tmp=$(echo "$PKG_FIND" | tr ' ' '\n')
 
-    for i in $PKG_SPECIFIC_OPERATIONS; do
-    
-        if echo "$tmp" | grep -q -x "$i"; then
-        
-            case "$i" in
-            
-                "virtualbox")
-                
-                    #Find which kernel is in use
-                    if pkg_find --quiet "linux"; then #Default Kernel
-                    
-                        PACKAGES+=" virtualbox-host-modules-arch"
-                    else
+    if [ "$1" == "--pre-install" ]; then
 
-                        PACKAGES+=" virtualbox-host-dkms"
-                    fi
+        for i in $PKG_SPECIFIC_OPERATIONS; do
+        
+            if echo "$tmp" | grep -q -x "$i"; then
+            
+                case "$i" in
+                
+                    "virtualbox")
                     
-                    if pkg_find --quiet "linux-lts"; then #Lts Kernel
+                        #Find which kernel is in use
+                        if pkg_find --quiet "linux"; then #Default Kernel
+                        
+                            PACKAGES+=" virtualbox-host-modules-arch"
+                        else
+
+                            PACKAGES+=" virtualbox-host-dkms"
+                        fi
+                        
+                        if pkg_find --quiet "linux-lts"; then #Lts Kernel
+                        
+                            PACKAGES+=" linux-lts-headers"
+                        fi
+                        
+                        #Warning! If you are using a custom kernel, find & install appropriate virtualbox headers.
+                        #They are not installed by default.
+                        #You can also visit: https://wiki.archlinux.org/title/VirtualBox#Installation_steps_for_Arch_Linux_hosts
+                    ;;
                     
-                        PACKAGES+=" linux-lts-headers"
-                    fi
+                    "clamav")
                     
-                    #Warning! If you are using a custom kernel, find & install appropriate virtualbox headers.
-                    #They are not installed by default.
-                    #You can also visit: https://wiki.archlinux.org/title/VirtualBox#Installation_steps_for_Arch_Linux_hosts
-                ;;
-                
-                "clamav")
-                
-                    SERVICES+=" clamav-freshclam"
-                ;;
-                
-                "lightdm-slick-greeter")
-                
-                    AUR_PACKAGES+=" lightdm-settings"
-                ;;
-                
-                "lightdm-gtk-greeter")
-                
-                    PACKAGES+=" lightdm-gtk-greeter-settings"
-                ;;
-            esac
-        fi
-    done
+                        SERVICES+=" clamav-freshclam"
+                    ;;
+                    
+                    "lightdm-slick-greeter")
+                    
+                        AUR_PACKAGES+=" lightdm-settings"
+                    ;;
+                    
+                    "lightdm-gtk-greeter")
+                    
+                        PACKAGES+=" lightdm-gtk-greeter-settings"
+                    ;;
+                esac
+            fi
+        done
+    elif [ "$1" == "--post-install" ]; then
+    
+        for i in $PKG_SPECIFIC_OPERATIONS; do
+
+            if echo "$tmp" | grep -q -x "$i"; then
+            
+                case "$i" in
+
+                    "nano-syntax-highlighting")
+
+                        echo 'include /usr/share/nano-syntax-highlighting/*.nanorc' >> "$MOUNT_PATH/etc/nanorc" #Include color schemes in the nano config
+                    ;;
+                esac
+            fi
+        done
+    else
+
+        failure "Error! (pkg_specific_operations): Only valid arguments are: \"--pre-install\" & \"--post-install\""
+    fi
 }
 
 function select_one () {
@@ -694,6 +717,7 @@ function select_one () {
 
 
 #Will be ran from arch-chroot with full sudo permissions
+#AUR packages will be installed here
 function post-install () {
 
     #Install aur packages (will be called in user's terminal)
@@ -1755,8 +1779,8 @@ echo
 select_one "Available driver packages are:" "$VIDEO_DRIVER" "$VIDEO_DRIVER_AUR"
 SELECTED_VIDEO_DRIVER="$SELECTION"
 
-#Do package specific stuff
-pkg_specific_operations
+#Do package specific stuff before the installation
+pkg_specific_operations --pre-install
 
 print_packages
 
@@ -2056,10 +2080,9 @@ export MOUNT_PATH="$MOUNT_PATH"
 export -f check_connection
 export -f failure
 export -f Exit_
-
 export -f post-install
 
-#Arrange temporary permissions
+#Arrange temporary permissions for chroot
 mkdir -p "$MOUNT_PATH/etc/sudoers.d/"
 printf "%s ALL=(ALL) NOPASSWD: ALL\n" "$USER_NAME" > "$MOUNT_PATH/etc/sudoers.d/temp_permissions"
 
@@ -2068,6 +2091,9 @@ arch-chroot "$MOUNT_PATH" /bin/bash -c "post-install" || Exit_ $?
 
 #Restore temporary permissions
 rm "$MOUNT_PATH/etc/sudoers.d/temp_permissions"
+
+#Do package specific stuff after the installation
+pkg_specific_operations --post-install
 
 #Backgrounds
 prompt_info "Arranging backgrounds..."
