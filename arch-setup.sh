@@ -277,7 +277,7 @@ function yes_no () {
     while ! output=$([ "$ANSWER" == "y" ] || [ "$ANSWER" == "Y" ] || [ "$ANSWER" == "n" ] || [ "$ANSWER" == "N" ]); do
 
         echo
-        prompt_warning "Wrong answer!"
+        prompt_warning "Wrong answer, expected 'y' or 'n'"
         printf "Please try again:"
         read -e -r -p " " ANSWER
     done
