@@ -620,11 +620,6 @@ function pkg_specific_operations () {
                         #You can also visit: https://wiki.archlinux.org/title/VirtualBox#Installation_steps_for_Arch_Linux_hosts
                     ;;
                     
-                    if pkg_find --quiet "linux-lts"; then #Lts Kernel
-                    
-                        PACKAGES+=" linux-lts-headers"
-                    fi
-                    
                     "lightdm-slick-greeter")
                     
                         AUR_PACKAGES+=" lightdm-settings"
@@ -654,7 +649,7 @@ function pkg_specific_operations () {
         done
     else
 
-        failure "Error! (pkg_specific_operations): Only valid arguments are: \"--pre-install\" & \"--post-install\""
+        failure "Error (pkg_specific_operations): Expected '--pre-install' or '--post-install'"
     fi
 }
 
