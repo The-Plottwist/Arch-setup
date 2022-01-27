@@ -665,13 +665,12 @@ function select_one () {
 
     prompt_different "$message"
     echo
-    echo
     
     local -i max=0
     for i in $official_pkgs; do
     
         max+=1
-        printf "${PURPLE}%s (${LIGHT_CYAN}%s${PURPLE}) ${NOCOLOUR}" "$i" "$max"
+        printf "${PURPLE}%s(${LIGHT_CYAN}%s${PURPLE}) ${NOCOLOUR}" "$i" "$max"
     done
     
     local -i aur_part=0
@@ -679,7 +678,7 @@ function select_one () {
     for i in $aur_pkgs; do
     
         max+=1
-        printf "${PURPLE}%s (${LIGHT_CYAN}%s${PURPLE}) ${NOCOLOUR}" "$i" "$max"
+        printf "${PURPLE}%s(${LIGHT_CYAN}%s${PURPLE}) ${NOCOLOUR}" "$i" "$max"
     done
     
     #Selection
@@ -758,20 +757,19 @@ function post-install () {
     #Generating home directories
     prompt_info "Generating 'root' home directories..."
     xdg-user-dirs-update
+
+    #Clear unnecessary files from last installation
+    if [ -f "/home/$USER_NAME/failed_aur_packages.txt" ]; then rm "/home/$USER_NAME/failed_aur_packages.txt"; fi
     
-    #Install go for yay (Not necessary, makepkg will auto-install dependencies)
-    # prompt_info "Installing go for aur helper..."
-    # pacman -S --noconfirm go
-    
-    #Export variables to use it in the user's shell
+    #Export variables to use it in the user terminal
     export USER_NAME="$USER_NAME"
     export MOUNT_PATH="$MOUNT_PATH"
     
-    #Export functions to call it in the user's shell
+    #Export functions to call it in the user terminal
     export -f aur_install
     export -f check_connection
 
-    #Run aur_install in the user's shell
+    #Run aur_install in the user terminal
     su "$USER_NAME" /bin/bash -c aur_install || Exit_ $?
 
     #Check failed builds
@@ -785,7 +783,9 @@ function post-install () {
 
         if [[ "$ANSWER" == "n" ]]; then
         
-            failure "You can find the failed packages in '$MOUNT_PATH/home/$USER_NAME/failed_aur_packages.txt'"
+            prompt_warning "You can find the failed packages in '$MOUNT_PATH/home/$USER_NAME/failed_aur_packages.txt'"
+            prompt_warning "Exiting..."
+            Exit_ 1 #Package installation needs a different exit other than failure, as I cannot fix a specific package installation
         fi
     fi
 
@@ -1766,12 +1766,17 @@ SELECTED_GREETER="$SELECTION"
 print_packages
 
 #Video driver selection
-prompt_different "Your graphics card model is:"
-lspci -v | grep -A1 -e VGA -e 3D
 echo
-printf "${YELLOW}You can look here for additional infromation: ${PURPLE}https://wiki.archlinux.org/title/xorg#Driver_installation${NOCOLOUR}"
+printf "${YELLOW}For which driver to choose, please look: ${LIGHT_BLUE}https://wiki.archlinux.org/title/xorg#Driver_installation${NOCOLOUR}"
 echo
 
+echo
+prompt_different "Your graphics card model is:"
+echo
+lspci -v | grep -A1 -e VGA -e 3D
+echo
+
+echo
 select_one "Available driver packages are:" "$VIDEO_DRIVER" "$VIDEO_DRIVER_AUR"
 SELECTED_VIDEO_DRIVER="$SELECTION"
 
