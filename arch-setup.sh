@@ -265,10 +265,10 @@ function Exit_ () {
 function failure () {
 
     prompt_warning "$1"
+    prompt_warning "Try a fresh clone; if the problem persists, consider opening an issue on GitHub."
     prompt_warning "Exiting..."
     Exit_ 1
 }
-
 
 function yes_no () {
 
@@ -1180,6 +1180,7 @@ elif (( swap_size > 8 )); then
     swap_size=$((( swap_size/2+swap_size )))
 fi
 swap_size="$swap_size*1024" #Convert to MiB
+
 
 # ------------------------------- Partitioning ------------------------------- #
 #In the below link, you can find the answer for the question of - Why first partition generally starts from sector 2048 (1mib)? -
